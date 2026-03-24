@@ -1,0 +1,21 @@
+{
+  "name": "developer-utilities-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Developer Utilities Application - Backend API + Frontend Client",
+  "scripts": {
+    "dev": "cd API/ClientApp && npm run dev",
+    "build": "cd API/ClientApp && npm run build",
+    "preview": "cd API/ClientApp && npm run preview",
+    "api": "cd API && dotnet run",
+    "api:build": "cd API && dotnet build"
+  },
+  "keywords": [
+    "developer-tools",
+    "utilities",
+    "vue",
+    "dotnet"
+  ],
+  "author": "",
+  "license": "MIT"
+}
