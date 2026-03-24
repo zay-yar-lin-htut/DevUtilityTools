@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: developer-utilities-app
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free          # change to "starter" or higher for always-on
+
+    # Render routes external traffic to the port your container EXPOSEs.
+    # Our Dockerfile exposes 8080, so this matches exactly.
+    port: 8080
+
+    # Path Render uses to decide if the deploy is healthy.
+    # The Vue SPA is served at "/" in production.
+    healthCheckPath: /
+
+    envVars:
+      # Tell ASP.NET Core to listen on the same port we expose
+      - key: ASPNETCORE_URLS
+        value: http://+:8080
+
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+
+      # JWT settings — override these in the Render dashboard as needed.
+      # "generateValue: true" lets Render create a secure random secret for you.
+      - key: Jwt__Key
+        generateValue: true   # generates a strong 128-char random string
+
+      - key: Jwt__Issuer
+        value: DevToolsAPI
+
+      - key: Jwt__Audience
+        value: DevToolsClient
+
+      - key: Jwt__ExpirationDays
+        value: "7"
