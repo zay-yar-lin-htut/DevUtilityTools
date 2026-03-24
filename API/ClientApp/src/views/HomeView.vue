@@ -2,7 +2,7 @@
   <div class="w-full">
 
     <!-- â”€â”€ Hero â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
-    <section class="hero-section" ref="heroRef">
+    <section class="hero-section">
       <!-- Atmospheric depth orbs -->
       <span class="orb orb-1" aria-hidden="true"></span>
       <span class="orb orb-2" aria-hidden="true"></span>
@@ -32,7 +32,7 @@
           <p class="section-sub">Everything you need, zero configuration.</p>
         </div>
 
-        <div class="tool-grid reveal-stagger" ref="gridRef">
+        <div class="tool-grid reveal-stagger">
           <!-- JSON Formatter -->
           <router-link to="/json-formatter" class="tool-card card-3d reveal" @mousemove="tilt($event)" @mouseleave="resetTilt($event)">
             <div class="tool-card-icon" style="--icon-clr:#4f46e5;--icon-bg:#eef2ff;">
@@ -123,8 +123,6 @@ interface SavedResult {
 
 const authStore = useAuthStore()
 const recentResults = ref<SavedResult[]>([])
-const heroRef = ref<HTMLElement | null>(null)
-const gridRef = ref<HTMLElement | null>(null)
 
 // â”€â”€ 3D card tilt â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const tilt = (e: MouseEvent) => {

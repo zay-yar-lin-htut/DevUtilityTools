@@ -8,9 +8,8 @@ RUN pnpm run build
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
-COPY API/API.sln ./
-COPY API/API.csproj API/
-RUN dotnet restore API.sln
+COPY API/API.csproj ./
+RUN dotnet restore API.csproj
 COPY API/ ./
 RUN dotnet build "API.csproj" -c Release -o /app/build
 
