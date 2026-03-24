@@ -41,18 +41,17 @@
               </button>
             </div>
             <div class="tool-input-output-container">
-              <div class="tool-gutter">
-                <div 
-                  v-for="n in originalLineCount" 
-                  :key="n" 
-                  class="tool-gutter-line"
-                >{{ n }}</div>
+              <div class="tool-gutter" ref="origDesktopGutter">
+                <div class="gutter-inner" :style="{ transform: `translateY(-${origScrollTop}px)` }">
+                  <div v-for="(entry, i) in originalGutterEntries" :key="i" class="tool-gutter-line">{{ entry ?? '' }}</div>
+                </div>
               </div>
               <textarea
                 ref="originalTextarea"
                 v-model="originalText"
                 @scroll="syncScrollOriginal"
-                class="tool-textarea"
+                @input="recomputeOriginalLines"
+                class="tool-textarea diff-textarea"
                 placeholder="Line 1&#10;Line 2"
               ></textarea>
             </div>
@@ -74,17 +73,16 @@
             </div>
             <div class="tool-input-output-container">
               <div class="tool-gutter">
-                <div 
-                  v-for="n in modifiedLineCount" 
-                  :key="n" 
-                  class="tool-gutter-line"
-                >{{ n }}</div>
+                <div class="gutter-inner" :style="{ transform: `translateY(-${modScrollTop}px)` }">
+                  <div v-for="(entry, i) in modifiedGutterEntries" :key="i" class="tool-gutter-line">{{ entry ?? '' }}</div>
+                </div>
               </div>
               <textarea
                 ref="modifiedTextarea"
                 v-model="modifiedText"
                 @scroll="syncScrollModified"
-                class="tool-textarea"
+                @input="recomputeModifiedLines"
+                class="tool-textarea diff-textarea"
                 placeholder="Line 1&#10;Line 2 modified"
               ></textarea>
             </div>
@@ -109,15 +107,16 @@
             </div>
             <div class="tool-input-output-container">
               <div class="tool-gutter">
-                <div 
-                  v-for="n in originalLineCount" 
-                  :key="n" 
-                  class="tool-gutter-line"
-                >{{ n }}</div>
+                <div class="gutter-inner" :style="{ transform: `translateY(-${origScrollTop}px)` }">
+                  <div v-for="(entry, i) in originalGutterEntries" :key="i" class="tool-gutter-line">{{ entry ?? '' }}</div>
+                </div>
               </div>
               <textarea
+                ref="mobileOriginalTextarea"
                 v-model="originalText"
-                class="tool-textarea"
+                @scroll="syncScrollOriginal"
+                @input="recomputeOriginalLines"
+                class="tool-textarea diff-textarea"
                 placeholder="Line 1&#10;Line 2"
               ></textarea>
             </div>
@@ -139,15 +138,16 @@
             </div>
             <div class="tool-input-output-container">
               <div class="tool-gutter">
-                <div 
-                  v-for="n in modifiedLineCount" 
-                  :key="n" 
-                  class="tool-gutter-line"
-                >{{ n }}</div>
+                <div class="gutter-inner" :style="{ transform: `translateY(-${modScrollTop}px)` }">
+                  <div v-for="(entry, i) in modifiedGutterEntries" :key="i" class="tool-gutter-line">{{ entry ?? '' }}</div>
+                </div>
               </div>
               <textarea
+                ref="mobileModifiedTextarea"
                 v-model="modifiedText"
-                class="tool-textarea"
+                @scroll="syncScrollModified"
+                @input="recomputeModifiedLines"
+                class="tool-textarea diff-textarea"
                 placeholder="Line 1&#10;Line 2 modified"
               ></textarea>
             </div>
@@ -385,7 +385,7 @@ Line 2 modified</pre>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { savedResultsApi } from '../api/saved'
 import { useAlert } from '../composables/useAlert'
@@ -405,22 +405,120 @@ const modifiedText = ref('')
 const activePanel = ref<'original' | 'modified'>('original')
 
 // Textarea refs for scrolling
-const originalTextarea = ref<HTMLTextAreaElement | null>(null)
-const modifiedTextarea = ref<HTMLTextAreaElement | null>(null)
+const originalTextarea       = ref<HTMLTextAreaElement | null>(null)
+const modifiedTextarea        = ref<HTMLTextAreaElement | null>(null)
+const mobileOriginalTextarea = ref<HTMLTextAreaElement | null>(null)
+const mobileModifiedTextarea = ref<HTMLTextAreaElement | null>(null)
 
 // Compare panel refs for scrolling
 const compareOriginalPanel = ref<HTMLElement | null>(null)
 const compareModifiedPanel = ref<HTMLElement | null>(null)
 
-// Line counts for input view
-const originalLineCount = computed(() => {
-  const count = originalText.value.split('\n').length
-  return count > 0 ? count : 1
+// Scroll offsets — drive gutter translateY so sync is always pixel-perfect
+const origScrollTop = ref(0)
+const modScrollTop  = ref(0)
+
+// Logical line counts — used in compare view header only
+const originalLineCount = computed(() => Math.max(1, originalText.value.split('\n').length))
+const modifiedLineCount = computed(() => Math.max(1, modifiedText.value.split('\n').length))
+
+// ── Gutter entries ──────────────────────────────────────────────────
+// For each logical line we measure how many visual rows it wraps to.
+// Shows the logical line number on the FIRST visual row; blank spacers
+// for every wrapped continuation row so the gutter stays pixel-perfect.
+type GutterEntry = number | null
+
+const originalGutterEntries = ref<GutterEntry[]>([1])
+const modifiedGutterEntries = ref<GutterEntry[]>([1])
+
+// Reusable off-screen gauge div (created once, reused for all measurements)
+let gaugeEl: HTMLDivElement | null = null
+const getGauge = (): HTMLDivElement => {
+  if (!gaugeEl) {
+    gaugeEl = document.createElement('div')
+    gaugeEl.setAttribute('aria-hidden', 'true')
+    Object.assign(gaugeEl.style, {
+      position: 'absolute', visibility: 'hidden', pointerEvents: 'none',
+      top: '-9999px', left: '-9999px',
+      whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'break-word',
+      boxSizing: 'content-box', border: 'none', padding: '0', margin: '0',
+    })
+    document.body.appendChild(gaugeEl)
+  }
+  return gaugeEl
+}
+
+const buildGutterEntries = (text: string, textareaEl: HTMLTextAreaElement): GutterEntry[] => {
+  const cs = getComputedStyle(textareaEl)
+  const lineH = parseFloat(cs.lineHeight) || 24
+
+  // clientWidth is 0 when the panel is hidden (inactive mobile tab).
+  // Fall back to the container width minus the gutter (3.5rem = 56px).
+  let innerW = textareaEl.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+  if (innerW <= 0) {
+    const container = textareaEl.closest('.tool-input-output-container') as HTMLElement | null
+    innerW = container
+      ? container.clientWidth - 56 - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+      : 300
+  }
+  if (innerW <= 0) innerW = 300  // absolute safety fallback
+
+  const gauge = getGauge()
+  gauge.style.width      = `${innerW}px`
+  gauge.style.fontFamily = cs.fontFamily
+  gauge.style.fontSize   = cs.fontSize
+  gauge.style.lineHeight = cs.lineHeight
+
+  const lines   = text.split('\n')
+  const entries: GutterEntry[] = []
+  for (let i = 0; i < lines.length; i++) {
+    gauge.textContent = lines[i] || '\u200b'  // zero-width space keeps height for empty lines
+    const rows = Math.max(1, Math.round(gauge.scrollHeight / lineH))
+    entries.push(i + 1)                        // logical line number on first visual row
+    for (let r = 1; r < rows; r++) entries.push(null)  // blank spacers for wrapped rows
+  }
+  return entries
+}
+
+const recomputeOriginalLines = async () => {
+  await nextTick()
+  const el = originalTextarea.value ?? mobileOriginalTextarea.value
+  if (el) originalGutterEntries.value = buildGutterEntries(originalText.value, el)
+  else    originalGutterEntries.value = originalText.value.split('\n').map((_, i) => i + 1)
+}
+
+const recomputeModifiedLines = async () => {
+  await nextTick()
+  const el = modifiedTextarea.value ?? mobileModifiedTextarea.value
+  if (el) modifiedGutterEntries.value = buildGutterEntries(modifiedText.value, el)
+  else    modifiedGutterEntries.value = modifiedText.value.split('\n').map((_, i) => i + 1)
+}
+
+// Re-run whenever text or active mobile tab changes
+watch(originalText, recomputeOriginalLines)
+watch(modifiedText, recomputeModifiedLines)
+watch(activePanel, async () => { await recomputeOriginalLines(); await recomputeModifiedLines() })
+
+// ResizeObserver: recompute whenever any textarea changes width (window resize / layout shift)
+let resizeObs: ResizeObserver | null = null
+onMounted(async () => {
+  await recomputeOriginalLines()
+  await recomputeModifiedLines()
+  // Re-measure after fonts finish loading (font metrics affect line wrapping)
+  document.fonts?.ready?.then(() => { recomputeOriginalLines(); recomputeModifiedLines() })
+
+  resizeObs = new ResizeObserver(() => {
+    recomputeOriginalLines()
+    recomputeModifiedLines()
+  })
+  ;[originalTextarea, modifiedTextarea, mobileOriginalTextarea, mobileModifiedTextarea]
+    .forEach(r => { if (r.value) resizeObs!.observe(r.value) })
+  resizeObs.observe(document.documentElement)
 })
 
-const modifiedLineCount = computed(() => {
-  const count = modifiedText.value.split('\n').length
-  return count > 0 ? count : 1
+onBeforeUnmount(() => {
+  resizeObs?.disconnect()
+  if (gaugeEl) { document.body.removeChild(gaugeEl); gaugeEl = null }
 })
 
 // Arrays for compare view
@@ -721,25 +819,13 @@ const getConflictLineClass = (conflictId: number, side: 'orig' | 'mod') => {
   return side === 'orig' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
 }
 
-// Sync scroll for input view
+// Sync scroll for input view — just update the reactive offset; the gutter uses transform:translateY
 const syncScrollOriginal = () => {
-  if (originalTextarea.value) {
-    const container = originalTextarea.value.parentElement as HTMLElement
-    const lineNumbers = container?.querySelector('.tool-gutter') as HTMLElement
-    if (lineNumbers) {
-      lineNumbers.scrollTop = originalTextarea.value.scrollTop
-    }
-  }
+  origScrollTop.value = originalTextarea.value?.scrollTop ?? mobileOriginalTextarea.value?.scrollTop ?? 0
 }
 
 const syncScrollModified = () => {
-  if (modifiedTextarea.value) {
-    const container = modifiedTextarea.value.parentElement as HTMLElement
-    const lineNumbers = container?.querySelector('.tool-gutter') as HTMLElement
-    if (lineNumbers) {
-      lineNumbers.scrollTop = modifiedTextarea.value.scrollTop
-    }
-  }
+  modScrollTop.value = modifiedTextarea.value?.scrollTop ?? mobileModifiedTextarea.value?.scrollTop ?? 0
 }
 
 // Sync scroll for compare view
@@ -903,5 +989,23 @@ const saveResult = async () => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* Prevent horizontal scroll on input textareas */
+.diff-textarea {
+  overflow-x: hidden;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/*
+  Gutter inner: driven via transform:translateY from the textarea scrollTop.
+  The .tool-gutter container already provides padding-top: 0.5rem (matches
+  the textarea padding-top), so we add NO extra padding here.
+*/
+.gutter-inner {
+  will-change: transform;
 }
 </style>
