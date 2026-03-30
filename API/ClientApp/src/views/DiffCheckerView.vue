@@ -194,7 +194,7 @@ Line 2 modified</pre>
           </button>
           
           <!-- Conflict Count -->
-          <div class="flex items-center gap-4">
+          <div class="flex items-center gap-3 flex-wrap">
             <div v-if="conflictCount > 0" class="px-4 py-2 bg-yellow-50 rounded-lg border border-yellow-200">
               <span class="text-yellow-800 font-medium">{{ conflictCount }}</span>
               <span class="text-yellow-700"> conflict(s) remaining</span>
@@ -202,6 +202,23 @@ Line 2 modified</pre>
             <div v-if="conflictCount === 0" class="px-4 py-2 bg-green-50 rounded-lg border border-green-200">
               <span class="text-green-800 font-medium">All conflicts resolved!</span>
             </div>
+            <!-- Bulk-resolve buttons — only shown when multiple conflicts remain -->
+            <template v-if="conflictCount > 1">
+              <button
+                @click="acceptAllOriginal"
+                class="px-3 py-1.5 text-sm font-medium bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                title="Resolve all remaining conflicts by keeping original text"
+              >
+                Accept All → Original
+              </button>
+              <button
+                @click="acceptAllModified"
+                class="px-3 py-1.5 text-sm font-medium bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                title="Resolve all remaining conflicts by keeping modified text"
+              >
+                Accept All → Modified
+              </button>
+            </template>
           </div>
           
           <div class="flex gap-2">
@@ -228,54 +245,69 @@ Line 2 modified</pre>
               ref="compareOriginalPanel"
               @scroll="syncCompareScrollOriginal"
             >
-              <template v-for="block in originalBlocks" :key="block.startIndex">
-                <!-- Normal block -->
-                <div 
-                  v-if="block.type === 'normal'"
-                  v-for="(line, idx) in block.lines" 
-                  :key="block.startIndex + idx"
-                  :class="(block.startIndex + idx) % 2 === 0 ? 'bg-white' : 'bg-gray-50'"
-                >
-                  <div class="flex">
-                    <span class="w-12 flex-shrink-0 text-right pr-2 text-gray-400 select-none bg-gray-100">{{ block.startIndex + idx + 1 }}</span>
-                    <span class="flex-1 p-1" style="white-space: pre;">{{ line }}</span>
-                  </div>
-                </div>
-                
-                <!-- Conflict block with full border -->
-                <div 
-                  v-if="block.type === 'conflict'"
-                  :class="[
-                    getConflictBlockClass(block.conflictId!, 'orig'),
-                    'border-2 border-red-500 rounded-md mb-2',
-                    !isConflictResolved(block.conflictId!) && selectedConflict === block.conflictId ? 'cursor-pointer' : ''
-                  ]"
-                  @click="!isConflictResolved(block.conflictId!) ? toggleConflict(block.conflictId!) : null"
-                >
-                <div 
-                  v-for="(line, idx) in block.lines" 
-                  :key="block.startIndex + idx"
-                  :class="getConflictLineClass(block.conflictId!, 'orig')"
-                >
-                  <div class="flex">
-                    <span class="w-12 flex-shrink-0 text-right pr-2 text-gray-400 select-none bg-gray-100">{{ block.startIndex + idx + 1 }}</span>
-                    <span class="flex-1 p-1" style="white-space: pre;">
-                      <template v-if="isConflictResolved(block.conflictId!)">{{ line }}</template>
-                      <template v-else v-for="(seg, segIdx) in getCharDiff(line, getCorrespondingLine(block.startIndex + idx, 'orig'), 'orig')" :key="segIdx">
-                        <span :class="seg.isDiff ? 'bg-red-300 font-semibold' : ''" style="white-space: pre;">{{ seg.text }}</span>
-                      </template>
-                    </span>
-                    <span v-if="idx === 0 && !isConflictResolved(block.conflictId!)" class="text-sm text-blue-600 mr-2 self-center">click</span>
-                  </div>
-                </div>
-                  
-                  <!-- Buttons below the block -->
-                  <div 
-                    v-if="selectedConflict === block.conflictId && !isConflictResolved(block.conflictId!)"
-                    class="p-2 bg-red-50 rounded-b-md"
+              <template v-for="seg in rowSegments" :key="seg.segStartIdx">
+                <!-- Equal segment -->
+                <template v-if="seg.type === 'equal'">
+                  <div
+                    v-for="(row, idx) in seg.rows"
+                    :key="seg.segStartIdx + idx"
+                    :class="selectedRowIdx === seg.segStartIdx + idx ? 'bg-yellow-100' : (seg.segStartIdx + idx) % 2 === 0 ? 'bg-white' : 'bg-gray-50'"
+                    @click="handleRowClick(seg.segStartIdx + idx, null)"
                   >
-                    <button 
-                      @click.stop="acceptOriginal(block.conflictId!)"
+                    <div class="flex">
+                      <span class="w-12 flex-shrink-0 text-right pr-2 text-gray-400 select-none bg-gray-100">{{ row.origLineNum }}</span>
+                      <span class="flex-1 p-1" style="white-space: pre;">{{ row.origLine }}</span>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- Conflict segment -->
+                <div
+                  v-else
+                  :class="[
+                    isConflictResolved(seg.conflictId!) ? 'border-l-4 border-blue-400' : 'border-l-4 border-red-500',
+                    'mb-0.5'
+                  ]"
+                >
+                  <div v-for="(row, idx) in seg.rows" :key="seg.segStartIdx + idx">
+                    <!-- Filler row: insert row has no orig line -->
+                    <div
+                      v-if="row.origLine === null"
+                      :class="['flex', selectedRowIdx === seg.segStartIdx + idx ? 'bg-yellow-100' : 'bg-gray-300']"
+                      style="height: 1.5rem;"
+                      @click.stop="handleRowClick(seg.segStartIdx + idx, seg.conflictId)"
+                    >
+                      <span class="w-12 flex-shrink-0"></span>
+                      <span class="flex-1"></span>
+                    </div>
+                    <!-- Content row: delete or replace -->
+                    <div
+                      v-else
+                      :class="selectedRowIdx === seg.segStartIdx + idx ? 'bg-yellow-100' : (isConflictResolved(seg.conflictId!) ? '' : 'bg-red-100 text-red-800')"
+                      @click.stop="handleRowClick(seg.segStartIdx + idx, seg.conflictId)"
+                    >
+                      <div class="flex">
+                        <span class="w-12 flex-shrink-0 text-right pr-2 text-gray-400 select-none bg-gray-100">{{ row.origLineNum }}</span>
+                        <span class="flex-1 p-1" style="white-space: pre;">
+                          <template v-if="!isConflictResolved(seg.conflictId!) && row.type === 'replace'">
+                            <template v-for="(s, si) in getCharDiff(row.origLine, row.modLine!, 'orig')" :key="si">
+                              <span :class="s.isDiff ? 'bg-red-300 font-semibold' : ''" style="white-space: pre;">{{ s.text }}</span>
+                            </template>
+                          </template>
+                          <template v-else>{{ row.origLine }}</template>
+                        </span>
+                        <span v-if="idx === 0 && !isConflictResolved(seg.conflictId!)" class="text-sm text-blue-600 mr-2 self-center">click</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Accept Original button -->
+                  <div
+                    v-if="selectedConflict === seg.conflictId && !isConflictResolved(seg.conflictId!)"
+                    class="p-2 bg-red-50"
+                  >
+                    <button
+                      @click.stop="acceptOriginal(seg.conflictId!)"
                       class="w-full px-3 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors"
                     >
                       Accept Original
@@ -298,54 +330,69 @@ Line 2 modified</pre>
               ref="compareModifiedPanel"
               @scroll="syncCompareScrollModified"
             >
-              <template v-for="block in modifiedBlocks" :key="block.startIndex">
-                <!-- Normal block -->
-                <div 
-                  v-if="block.type === 'normal'"
-                  v-for="(line, idx) in block.lines" 
-                  :key="block.startIndex + idx"
-                  :class="(block.startIndex + idx) % 2 === 0 ? 'bg-white' : 'bg-gray-50'"
-                >
-                  <div class="flex">
-                    <span class="w-12 flex-shrink-0 text-right pr-2 text-gray-400 select-none bg-gray-100">{{ block.startIndex + idx + 1 }}</span>
-                    <span class="flex-1 p-1" style="white-space: pre;">{{ line }}</span>
-                  </div>
-                </div>
-                
-                <!-- Conflict block with full border -->
-                <div 
-                  v-if="block.type === 'conflict'"
-                  :class="[
-                    getConflictBlockClass(block.conflictId!, 'mod'),
-                    'border-2 border-green-500 rounded-md mb-2',
-                    !isConflictResolved(block.conflictId!) && selectedConflict === block.conflictId ? 'cursor-pointer' : ''
-                  ]"
-                  @click="!isConflictResolved(block.conflictId!) ? toggleConflict(block.conflictId!) : null"
-                >
-                  <div 
-                    v-for="(line, idx) in block.lines" 
-                    :key="block.startIndex + idx"
-                    :class="getConflictLineClass(block.conflictId!, 'mod')"
+              <template v-for="seg in rowSegments" :key="seg.segStartIdx">
+                <!-- Equal segment -->
+                <template v-if="seg.type === 'equal'">
+                  <div
+                    v-for="(row, idx) in seg.rows"
+                    :key="seg.segStartIdx + idx"
+                    :class="selectedRowIdx === seg.segStartIdx + idx ? 'bg-yellow-100' : (seg.segStartIdx + idx) % 2 === 0 ? 'bg-white' : 'bg-gray-50'"
+                    @click="handleRowClick(seg.segStartIdx + idx, null)"
                   >
                     <div class="flex">
-                      <span class="w-12 flex-shrink-0 text-right pr-2 text-gray-400 select-none bg-gray-100">{{ block.startIndex + idx + 1 }}</span>
-                      <span class="flex-1 p-1" style="white-space: pre;">
-                        <template v-if="isConflictResolved(block.conflictId!)">{{ line }}</template>
-                        <template v-else v-for="(seg, segIdx) in getCharDiff(getCorrespondingLine(block.startIndex + idx, 'mod'), line, 'mod')" :key="segIdx">
-                          <span :class="seg.isDiff ? 'bg-green-300 font-semibold' : ''" style="white-space: pre;">{{ seg.text }}</span>
-                        </template>
-                      </span>
-                      <span v-if="idx === 0 && !isConflictResolved(block.conflictId!)" class="text-sm text-blue-600 mr-2 self-center">click</span>
+                      <span class="w-12 flex-shrink-0 text-right pr-2 text-gray-400 select-none bg-gray-100">{{ row.modLineNum }}</span>
+                      <span class="flex-1 p-1" style="white-space: pre;">{{ row.modLine }}</span>
                     </div>
                   </div>
-                  
-                  <!-- Buttons below the block -->
-                  <div 
-                    v-if="selectedConflict === block.conflictId && !isConflictResolved(block.conflictId!)"
-                    class="p-2 bg-green-50 rounded-b-md"
+                </template>
+
+                <!-- Conflict segment -->
+                <div
+                  v-else
+                  :class="[
+                    isConflictResolved(seg.conflictId!) ? 'border-l-4 border-blue-400' : 'border-l-4 border-green-500',
+                    'mb-0.5'
+                  ]"
+                >
+                  <div v-for="(row, idx) in seg.rows" :key="seg.segStartIdx + idx">
+                    <!-- Filler row: delete row has no mod line -->
+                    <div
+                      v-if="row.modLine === null"
+                      :class="['flex', selectedRowIdx === seg.segStartIdx + idx ? 'bg-yellow-100' : 'bg-gray-300']"
+                      style="height: 1.5rem;"
+                      @click.stop="handleRowClick(seg.segStartIdx + idx, seg.conflictId)"
+                    >
+                      <span class="w-12 flex-shrink-0"></span>
+                      <span class="flex-1"></span>
+                    </div>
+                    <!-- Content row: insert or replace -->
+                    <div
+                      v-else
+                      :class="selectedRowIdx === seg.segStartIdx + idx ? 'bg-yellow-100' : (isConflictResolved(seg.conflictId!) ? '' : 'bg-green-100 text-green-800')"
+                      @click.stop="handleRowClick(seg.segStartIdx + idx, seg.conflictId)"
+                    >
+                      <div class="flex">
+                        <span class="w-12 flex-shrink-0 text-right pr-2 text-gray-400 select-none bg-gray-100">{{ row.modLineNum }}</span>
+                        <span class="flex-1 p-1" style="white-space: pre;">
+                          <template v-if="!isConflictResolved(seg.conflictId!) && row.type === 'replace'">
+                            <template v-for="(s, si) in getCharDiff(row.origLine!, row.modLine, 'mod')" :key="si">
+                              <span :class="s.isDiff ? 'bg-green-300 font-semibold' : ''" style="white-space: pre;">{{ s.text }}</span>
+                            </template>
+                          </template>
+                          <template v-else>{{ row.modLine }}</template>
+                        </span>
+                        <span v-if="idx === 0 && !isConflictResolved(seg.conflictId!)" class="text-sm text-blue-600 mr-2 self-center">click</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Accept Modified button -->
+                  <div
+                    v-if="selectedConflict === seg.conflictId && !isConflictResolved(seg.conflictId!)"
+                    class="p-2 bg-green-50"
                   >
-                    <button 
-                      @click.stop="acceptModified(block.conflictId!)"
+                    <button
+                      @click.stop="acceptModified(seg.conflictId!)"
                       class="w-full px-3 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
                     >
                       Accept Modified
@@ -365,16 +412,29 @@ Line 2 modified</pre>
           <div class="border border-gray-300 rounded-lg overflow-hidden">
             <div class="bg-gray-100 px-4 py-2 border-b border-gray-300">
               <span class="font-bold text-gray-700">Merged Result</span>
+              <span class="text-gray-500 text-base ml-2">({{ mergedResult.length }} lines)</span>
             </div>
-            <div 
-              class="overflow-auto font-mono text-base p-4 bg-gray-50"
-              style="height: 18rem; line-height: 1.5rem; white-space: pre-wrap; word-break: break-all;"
+            <div
+              ref="compareResultPanel"
+              class="overflow-auto font-mono text-base bg-gray-50"
+              style="height: 18rem; line-height: 1.5rem;"
+              @scroll="syncCompareScrollResult"
             >
-              <div v-if="mergedResult.length === 0" class="text-gray-400 italic">
+              <div v-if="mergedResult.length === 0" class="p-4 text-gray-400 italic">
                 No result yet. Resolve conflicts to see merged result.
               </div>
               <template v-else>
-                <span v-for="(line, index) in mergedResult" :key="index">{{ line }}<br v-if="index < mergedResult.length - 1"></span>
+                <div
+                  v-for="(line, index) in mergedResult"
+                  :key="index"
+                  :class="mergedResultMap[index] === selectedRowIdx ? 'bg-yellow-100' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50'"
+                  @click="handleRowClick(mergedResultMap[index], null)"
+                >
+                  <div class="flex">
+                    <span class="w-12 flex-shrink-0 text-right pr-2 text-gray-400 select-none bg-gray-100">{{ index + 1 }}</span>
+                    <span class="flex-1 p-1" style="white-space: pre;">{{ line }}</span>
+                  </div>
+                </div>
               </template>
             </div>
           </div>
@@ -413,6 +473,7 @@ const mobileModifiedTextarea = ref<HTMLTextAreaElement | null>(null)
 // Compare panel refs for scrolling
 const compareOriginalPanel = ref<HTMLElement | null>(null)
 const compareModifiedPanel = ref<HTMLElement | null>(null)
+const compareResultPanel   = ref<HTMLElement | null>(null)
 
 // Scroll offsets — drive gutter translateY so sync is always pixel-perfect
 const origScrollTop = ref(0)
@@ -525,175 +586,186 @@ onBeforeUnmount(() => {
 const originalLinesArr = computed(() => originalText.value.split('\n'))
 const modifiedLinesArr = computed(() => modifiedText.value.split('\n'))
 
-// Compute original blocks for rendering
-interface LineBlock {
-  type: 'normal' | 'conflict'
-  startIndex: number
-  endIndex: number
-  conflictId?: number
-  lines: string[]
+// One aligned row shared by both panels (LCS-based)
+interface AlignedRow {
+  type: 'equal' | 'delete' | 'insert' | 'replace'
+  origLine: string | null   // null → filler cell on orig side
+  modLine: string | null    // null → filler cell on mod side
+  origLineNum: number | null
+  modLineNum: number | null
+  conflictId: number | null
+}
+
+// Grouped view segment for rendering with borders
+interface RowSegment {
+  type: 'equal' | 'conflict'
+  conflictId: number | null
+  rows: AlignedRow[]
+  segStartIdx: number
 }
 
 // Conflict tracking
 interface Conflict {
   id: number
-  origStartIndex: number
-  origEndIndex: number
-  modStartIndex: number
-  modEndIndex: number
   resolved: boolean
   resolvedWith: 'original' | 'modified' | null
 }
 
 const conflicts = ref<Conflict[]>([])
 const selectedConflict = ref<number | null>(null)
+const selectedRowIdx   = ref<number | null>(null)
+const alignedRows = ref<AlignedRow[]>([])
 let conflictIdCounter = 0
 
-// Computed blocks for original - shows accepted text when resolved
-const originalBlocks = computed((): LineBlock[] => {
-  const blocks: LineBlock[] = []
-  const lines = originalLinesArr.value
-  const sortedConflicts = [...conflicts.value]
-    .filter(c => c.origStartIndex !== -1 && c.origEndIndex !== -1)
-    .sort((a, b) => a.origStartIndex - b.origStartIndex)
-  
-  let prevEnd = -1
-  
-  for (const conflict of sortedConflicts) {
-    if (conflict.origStartIndex > prevEnd + 1) {
-      blocks.push({
-        type: 'normal',
-        startIndex: prevEnd + 1,
-        endIndex: conflict.origStartIndex - 1,
-        lines: lines.slice(prevEnd + 1, conflict.origStartIndex)
-      })
-    }
-    
-    let displayLines: string[]
-    if (conflict.resolved && conflict.resolvedWith === 'modified') {
-      displayLines = modifiedLinesArr.value.slice(conflict.modStartIndex, conflict.modEndIndex + 1)
-    } else {
-      displayLines = lines.slice(conflict.origStartIndex, conflict.origEndIndex + 1)
-    }
-    
-    blocks.push({
-      type: conflict.resolved ? 'normal' : 'conflict',
-      startIndex: conflict.origStartIndex,
-      endIndex: conflict.origEndIndex,
-      conflictId: conflict.id,
-      lines: displayLines
-    })
-    prevEnd = conflict.origEndIndex
-  }
-  
-  if (prevEnd < lines.length - 1) {
-    blocks.push({
-      type: 'normal',
-      startIndex: prevEnd + 1,
-      endIndex: lines.length - 1,
-      lines: lines.slice(prevEnd + 1)
-    })
-  }
-  
-  return blocks
-})
+// LCS-based line diff — builds an array of AlignedRow (called by compareDiff)
+const lcsLineDiff = (): AlignedRow[] => {
+  const origLines = originalText.value.split('\n')
+  const modLines  = modifiedText.value.split('\n')
+  const m = origLines.length, n = modLines.length
 
-// Computed blocks for modified - shows accepted text when resolved
-const modifiedBlocks = computed((): LineBlock[] => {
-  const blocks: LineBlock[] = []
-  const lines = modifiedLinesArr.value
-  const sortedConflicts = [...conflicts.value]
-    .filter(c => c.modStartIndex !== -1 && c.modEndIndex !== -1)
-    .sort((a, b) => a.modStartIndex - b.modStartIndex)
-  
-  let prevEnd = -1
-  
-  for (const conflict of sortedConflicts) {
-    if (conflict.modStartIndex > prevEnd + 1) {
-      blocks.push({
-        type: 'normal',
-        startIndex: prevEnd + 1,
-        endIndex: conflict.modStartIndex - 1,
-        lines: lines.slice(prevEnd + 1, conflict.modStartIndex)
-      })
+  // Build DP table
+  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0))
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = origLines[i - 1] === modLines[j - 1]
+        ? dp[i - 1][j - 1] + 1
+        : Math.max(dp[i - 1][j], dp[i][j - 1])
     }
-    
-    let displayLines: string[]
-    if (conflict.resolved && conflict.resolvedWith === 'original') {
-      displayLines = originalLinesArr.value.slice(conflict.origStartIndex, conflict.origEndIndex + 1)
+  }
+
+  // Backtrack to get edit ops
+  type Op = { type: 'equal' | 'delete' | 'insert'; oi: number; mi: number }
+  const ops: Op[] = []
+  let i = m, j = n
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && origLines[i - 1] === modLines[j - 1]) {
+      ops.push({ type: 'equal', oi: i - 1, mi: j - 1 }); i--; j--
+    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+      ops.push({ type: 'insert', oi: -1, mi: j - 1 }); j--
     } else {
-      displayLines = lines.slice(conflict.modStartIndex, conflict.modEndIndex + 1)
+      ops.push({ type: 'delete', oi: i - 1, mi: -1 }); i--
     }
-    
-    blocks.push({
-      type: conflict.resolved ? 'normal' : 'conflict',
-      startIndex: conflict.modStartIndex,
-      endIndex: conflict.modEndIndex,
-      conflictId: conflict.id,
-      lines: displayLines
-    })
-    prevEnd = conflict.modEndIndex
   }
-  
-  if (prevEnd < lines.length - 1) {
-    blocks.push({
-      type: 'normal',
-      startIndex: prevEnd + 1,
-      endIndex: lines.length - 1,
-      lines: lines.slice(prevEnd + 1)
-    })
+  ops.reverse()
+
+  // Build AlignedRows: pair adjacent deletes+inserts as 'replace', remainder as delete/insert
+  const rows: AlignedRow[] = []
+  let origLineNum = 0, modLineNum = 0
+  let pi = 0
+
+  while (pi < ops.length) {
+    const op = ops[pi]
+    if (op.type === 'equal') {
+      origLineNum++; modLineNum++
+      rows.push({ type: 'equal', origLine: origLines[op.oi], modLine: modLines[op.mi],
+                  origLineNum, modLineNum, conflictId: null })
+      pi++
+    } else {
+      // Collect entire non-equal run
+      const deletes: Op[] = [], inserts: Op[] = []
+      while (pi < ops.length && ops[pi].type !== 'equal') {
+        if (ops[pi].type === 'delete') deletes.push(ops[pi])
+        else                           inserts.push(ops[pi])
+        pi++
+      }
+      const pairCount = Math.min(deletes.length, inserts.length)
+      // Paired → replace
+      for (let k = 0; k < pairCount; k++) {
+        origLineNum++; modLineNum++
+        rows.push({ type: 'replace', origLine: origLines[deletes[k].oi], modLine: modLines[inserts[k].mi],
+                    origLineNum, modLineNum, conflictId: null })
+      }
+      // Unpaired deletes → delete (filler on mod side)
+      for (let k = pairCount; k < deletes.length; k++) {
+        origLineNum++
+        rows.push({ type: 'delete', origLine: origLines[deletes[k].oi], modLine: null,
+                    origLineNum, modLineNum: null, conflictId: null })
+      }
+      // Unpaired inserts → insert (filler on orig side)
+      for (let k = pairCount; k < inserts.length; k++) {
+        modLineNum++
+        rows.push({ type: 'insert', origLine: null, modLine: modLines[inserts[k].mi],
+                    origLineNum: null, modLineNum, conflictId: null })
+      }
+    }
   }
-  
-  return blocks
+  return rows
+}
+
+// Groups alignedRows into equal-runs vs conflict-blocks for bordered rendering
+const rowSegments = computed((): RowSegment[] => {
+  const segs: RowSegment[] = []
+  const rows = alignedRows.value
+  let i = 0
+  while (i < rows.length) {
+    if (rows[i].conflictId === null) {
+      const start = i
+      const segRows: AlignedRow[] = []
+      while (i < rows.length && rows[i].conflictId === null) segRows.push(rows[i++])
+      segs.push({ type: 'equal', conflictId: null, rows: segRows, segStartIdx: start })
+    } else {
+      const cid = rows[i].conflictId!
+      const start = i
+      const segRows: AlignedRow[] = []
+      while (i < rows.length && rows[i].conflictId === cid) segRows.push(rows[i++])
+      segs.push({ type: 'conflict', conflictId: cid, rows: segRows, segStartIdx: start })
+    }
+  }
+  return segs
 })
 
 const conflictCount = computed(() => conflicts.value.filter(c => !c.resolved).length)
 
-// Merge results based on resolved conflicts
+// Merge results: equal rows always kept; conflict rows only if resolved
 const mergedResult = computed(() => {
+  if (alignedRows.value.length === 0) return []
   const result: string[] = []
-  const origLines = originalLinesArr.value
-  const modLines = modifiedLinesArr.value
-  const maxLength = Math.max(origLines.length, modLines.length)
-  
   let i = 0
-  while (i < maxLength) {
-    // Check if this line is in a conflict block
-    const conflict = conflicts.value.find(c => 
-      (c.origStartIndex !== -1 && i >= c.origStartIndex && i <= c.origEndIndex) ||
-      (c.modStartIndex !== -1 && i >= c.modStartIndex && i <= c.modEndIndex)
-    )
-    
-    if (conflict) {
-      if (conflict.resolved) {
-        // Add all lines from the resolved side
-        if (conflict.resolvedWith === 'original' && conflict.origStartIndex !== -1) {
-          for (let j = conflict.origStartIndex; j <= conflict.origEndIndex; j++) {
-            result.push(origLines[j] ?? '')
-          }
-        } else if (conflict.resolvedWith === 'modified' && conflict.modStartIndex !== -1) {
-          for (let j = conflict.modStartIndex; j <= conflict.modEndIndex; j++) {
-            result.push(modLines[j] ?? '')
-          }
-        }
-      }
-      // Skip to end of block
-      const blockEnd = Math.max(conflict.origEndIndex, conflict.modEndIndex)
-      i = blockEnd + 1
-    } else {
-      // No conflict - lines are the same
-      if (origLines[i] !== undefined && modLines[i] !== undefined) {
-        result.push(origLines[i])
-      } else if (origLines[i] !== undefined) {
-        result.push(origLines[i])
-      } else if (modLines[i] !== undefined) {
-        result.push(modLines[i])
-      }
+  while (i < alignedRows.value.length) {
+    const row = alignedRows.value[i]
+    if (row.conflictId === null) {
+      result.push(row.origLine!)
       i++
+    } else {
+      const cid = row.conflictId
+      const conflict = conflicts.value.find(c => c.id === cid)
+      // Collect all rows for this conflict block
+      while (i < alignedRows.value.length && alignedRows.value[i].conflictId === cid) {
+        const r = alignedRows.value[i]
+        if (conflict?.resolved) {
+          if (conflict.resolvedWith === 'original' && r.origLine !== null) result.push(r.origLine)
+          else if (conflict.resolvedWith === 'modified' && r.modLine !== null) result.push(r.modLine)
+        }
+        i++
+      }
     }
   }
-  
   return result
+})
+
+// Maps each merged-result line index → its alignedRows index (for cross-panel row highlighting)
+const mergedResultMap = computed((): number[] => {
+  if (alignedRows.value.length === 0) return []
+  const map: number[] = []
+  let i = 0
+  while (i < alignedRows.value.length) {
+    const row = alignedRows.value[i]
+    if (row.conflictId === null) {
+      map.push(i); i++
+    } else {
+      const cid = row.conflictId
+      const conflict = conflicts.value.find(c => c.id === cid)
+      while (i < alignedRows.value.length && alignedRows.value[i].conflictId === cid) {
+        if (conflict?.resolved) {
+          const r = alignedRows.value[i]
+          if (conflict.resolvedWith === 'original' && r.origLine !== null) map.push(i)
+          else if (conflict.resolvedWith === 'modified' && r.modLine !== null) map.push(i)
+        }
+        i++
+      }
+    }
+  }
+  return map
 })
 
 // Character-level diff segments
@@ -736,26 +808,6 @@ const getCharDiff = (origLine: string, modLine: string, side: 'orig' | 'mod'): D
   return segments
 }
 
-// Get corresponding line from opposite side
-const getCorrespondingLine = (index: number, side: 'orig' | 'mod'): string => {
-  const conflict = conflicts.value.find(c => 
-    side === 'orig' ? 
-      (c.origStartIndex !== -1 && index >= c.origStartIndex && index <= c.origEndIndex) :
-      (c.modStartIndex !== -1 && index >= c.modStartIndex && index <= c.modEndIndex)
-  )
-  
-  if (conflict) {
-    if (side === 'orig' && conflict.modStartIndex !== -1) {
-      const modIndex = conflict.modStartIndex + (index - conflict.origStartIndex)
-      return modifiedLinesArr.value[modIndex] ?? ''
-    } else if (side === 'mod' && conflict.origStartIndex !== -1) {
-      const origIndex = conflict.origStartIndex + (index - conflict.modStartIndex)
-      return originalLinesArr.value[origIndex] ?? ''
-    }
-  }
-  return ''
-}
-
 // Toggle conflict selection
 const toggleConflict = (conflictId: number) => {
   if (selectedConflict.value === conflictId) {
@@ -763,6 +815,13 @@ const toggleConflict = (conflictId: number) => {
   } else {
     selectedConflict.value = conflictId
   }
+}
+
+// Click a row: highlight it across all three panels; also toggles conflict if unresolved
+const handleRowClick = (rowIdx: number | null, conflictId: number | null) => {
+  if (rowIdx === null) return
+  selectedRowIdx.value = selectedRowIdx.value === rowIdx ? null : rowIdx
+  if (conflictId !== null && !isConflictResolved(conflictId)) toggleConflict(conflictId)
 }
 
 // Accept original for a conflict block
@@ -785,6 +844,28 @@ const acceptModified = (conflictId: number) => {
     selectedConflict.value = null
     alert.showSuccess('Accepted modified text')
   }
+}
+
+// Bulk-resolve all remaining conflicts with original
+const acceptAllOriginal = async () => {
+  const remaining = conflicts.value.filter(c => !c.resolved)
+  if (remaining.length === 0) return
+  const confirmed = await confirm.confirm(`Accept original text for all ${remaining.length} remaining conflict(s)?`)
+  if (!confirmed) return
+  remaining.forEach(c => { c.resolved = true; c.resolvedWith = 'original' })
+  selectedConflict.value = null
+  alert.showSuccess(`Accepted original for ${remaining.length} conflict(s)`)
+}
+
+// Bulk-resolve all remaining conflicts with modified
+const acceptAllModified = async () => {
+  const remaining = conflicts.value.filter(c => !c.resolved)
+  if (remaining.length === 0) return
+  const confirmed = await confirm.confirm(`Accept modified text for all ${remaining.length} remaining conflict(s)?`)
+  if (!confirmed) return
+  remaining.forEach(c => { c.resolved = true; c.resolvedWith = 'modified' })
+  selectedConflict.value = null
+  alert.showSuccess(`Accepted modified for ${remaining.length} conflict(s)`)
 }
 
 // Check if conflict is resolved
@@ -828,86 +909,54 @@ const syncScrollModified = () => {
   modScrollTop.value = modifiedTextarea.value?.scrollTop ?? mobileModifiedTextarea.value?.scrollTop ?? 0
 }
 
-// Sync scroll for compare view
+// Sync scroll for compare view — keep all three panels in lockstep
 const syncCompareScrollOriginal = () => {
-  if (compareOriginalPanel.value && compareModifiedPanel.value) {
-    compareModifiedPanel.value.scrollTop = compareOriginalPanel.value.scrollTop
-  }
+  const top = compareOriginalPanel.value?.scrollTop ?? 0
+  if (compareModifiedPanel.value) compareModifiedPanel.value.scrollTop = top
+  if (compareResultPanel.value)   compareResultPanel.value.scrollTop   = top
 }
 
 const syncCompareScrollModified = () => {
-  if (compareOriginalPanel.value && compareModifiedPanel.value) {
-    compareOriginalPanel.value.scrollTop = compareModifiedPanel.value.scrollTop
-  }
+  const top = compareModifiedPanel.value?.scrollTop ?? 0
+  if (compareOriginalPanel.value) compareOriginalPanel.value.scrollTop = top
+  if (compareResultPanel.value)   compareResultPanel.value.scrollTop   = top
 }
 
-// Compare diff
+const syncCompareScrollResult = () => {
+  const top = compareResultPanel.value?.scrollTop ?? 0
+  if (compareOriginalPanel.value) compareOriginalPanel.value.scrollTop = top
+  if (compareModifiedPanel.value) compareModifiedPanel.value.scrollTop = top
+}
+
+// Compare diff — LCS-based with filler row alignment
 const compareDiff = () => {
   if (!originalText.value.trim() && !modifiedText.value.trim()) {
     alert.showError('Please enter text in at least one field')
     return
   }
-  
-  // Detect conflicts as blocks
+
   conflicts.value = []
   conflictIdCounter = 0
-  
-  const origLines = originalText.value.split('\n')
-  const modLines = modifiedText.value.split('\n')
-  
-  const maxLength = Math.max(origLines.length, modLines.length)
-  
-  let currentBlockStart = -1
-  let currentBlockOrigStart = -1
-  let currentBlockModStart = -1
-  
-  for (let i = 0; i < maxLength; i++) {
-    const origLine = origLines[i]
-    const modLine = modLines[i]
-    
-    // Check if lines differ
-    if (origLine !== modLine) {
-      // Start a new block if not already in one
-      if (currentBlockStart === -1) {
-        currentBlockStart = i
-        currentBlockOrigStart = origLines[i] !== undefined ? i : -1
-        currentBlockModStart = modLines[i] !== undefined ? i : -1
+
+  const rows = lcsLineDiff()
+
+  // Stamp conflictId onto each contiguous non-equal run
+  let pi = 0
+  while (pi < rows.length) {
+    if (rows[pi].type !== 'equal') {
+      conflictIdCounter++
+      const cid = conflictIdCounter
+      conflicts.value.push({ id: cid, resolved: false, resolvedWith: null })
+      while (pi < rows.length && rows[pi].type !== 'equal') {
+        rows[pi].conflictId = cid
+        pi++
       }
     } else {
-      // Lines are the same - close block if open
-      if (currentBlockStart !== -1) {
-        conflictIdCounter++
-        conflicts.value.push({
-          id: conflictIdCounter,
-          origStartIndex: currentBlockOrigStart,
-          origEndIndex: i - 1,
-          modStartIndex: currentBlockModStart,
-          modEndIndex: i - 1,
-          resolved: false,
-          resolvedWith: null
-        })
-        currentBlockStart = -1
-        currentBlockOrigStart = -1
-        currentBlockModStart = -1
-      }
+      pi++
     }
   }
-  
-  // Close any remaining block at end
-  if (currentBlockStart !== -1) {
-    conflictIdCounter++
-    conflicts.value.push({
-      id: conflictIdCounter,
-      origStartIndex: currentBlockOrigStart,
-      origEndIndex: origLines.length - 1,
-      modStartIndex: currentBlockModStart,
-      modEndIndex: modLines.length - 1,
-      resolved: false,
-      resolvedWith: null
-    })
-  }
-  
-  // Switch to compare view
+
+  alignedRows.value = rows
   viewMode.value = 'compare'
 }
 
