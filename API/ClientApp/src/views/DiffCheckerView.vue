@@ -197,26 +197,26 @@ Line 2 modified</pre>
           <div class="flex items-center gap-3 flex-wrap">
             <div v-if="conflictCount > 0" class="px-4 py-2 bg-yellow-50 rounded-lg border border-yellow-200">
               <span class="text-yellow-800 font-medium">{{ conflictCount }}</span>
-              <span class="text-yellow-700"> conflict(s) remaining</span>
+              <span class="text-yellow-700"> change(s) remaining</span>
             </div>
             <div v-if="conflictCount === 0" class="px-4 py-2 bg-green-50 rounded-lg border border-green-200">
-              <span class="text-green-800 font-medium">All conflicts resolved!</span>
+              <span class="text-green-800 font-medium">All changes resolved!</span>
             </div>
             <!-- Bulk-resolve buttons — only shown when multiple conflicts remain -->
             <template v-if="conflictCount > 1">
               <button
                 @click="acceptAllOriginal"
                 class="px-3 py-1.5 text-sm font-medium bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
-                title="Resolve all remaining conflicts by keeping original text"
+                title="Resolve all remaining changes by keeping original text"
               >
                 Accept All → Original
               </button>
               <button
                 @click="acceptAllModified"
                 class="px-3 py-1.5 text-sm font-medium bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-                title="Resolve all remaining conflicts by keeping modified text"
+                title="Resolve all remaining changes by keeping modified text"
               >
-                Accept All → Modified
+                Accept All ← Modified
               </button>
             </template>
           </div>
@@ -310,7 +310,7 @@ Line 2 modified</pre>
                       @click.stop="acceptOriginal(seg.conflictId!)"
                       class="w-full px-3 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors"
                     >
-                      Accept Original
+                      Accept Original >
                     </button>
                   </div>
                 </div>
@@ -395,7 +395,7 @@ Line 2 modified</pre>
                       @click.stop="acceptModified(seg.conflictId!)"
                       class="w-full px-3 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
                     >
-                      Accept Modified
+                      < Accept Modified
                     </button>
                   </div>
                 </div>
@@ -421,7 +421,7 @@ Line 2 modified</pre>
               @scroll="syncCompareScrollResult"
             >
               <div v-if="mergedResult.length === 0" class="p-4 text-gray-400 italic">
-                No result yet. Resolve conflicts to see merged result.
+                No result yet. Resolve changes to see merged result.
               </div>
               <template v-else>
                 <div
@@ -813,10 +813,10 @@ const toggleConflict = (conflictId: number) => {
   }
 }
 
-// Click a row: highlight it across all three panels; also toggles conflict if unresolved
+// Click a row: highlight it across all three panels; also toggles change block if unresolved
 const handleRowClick = (rowIdx: number | null, conflictId: number | null) => {
   if (rowIdx === null) return
-  selectedRowIdx.value = selectedRowIdx.value === rowIdx ? null : rowIdx
+  selectedRowIdx.value = rowIdx
   if (conflictId !== null && !isConflictResolved(conflictId)) toggleConflict(conflictId)
 }
 
@@ -846,22 +846,22 @@ const acceptModified = (conflictId: number) => {
 const acceptAllOriginal = async () => {
   const remaining = conflicts.value.filter(c => !c.resolved)
   if (remaining.length === 0) return
-  const confirmed = await confirm.confirm(`Accept original text for all ${remaining.length} remaining conflict(s)?`)
+  const confirmed = await confirm.confirm(`Accept original text for all ${remaining.length} remaining change(s)?`)
   if (!confirmed) return
   remaining.forEach(c => { c.resolved = true; c.resolvedWith = 'original' })
   selectedConflict.value = null
-  alert.showSuccess(`Accepted original for ${remaining.length} conflict(s)`)
+  alert.showSuccess(`Accepted original for ${remaining.length} change(s)`)
 }
 
 // Bulk-resolve all remaining conflicts with modified
 const acceptAllModified = async () => {
   const remaining = conflicts.value.filter(c => !c.resolved)
   if (remaining.length === 0) return
-  const confirmed = await confirm.confirm(`Accept modified text for all ${remaining.length} remaining conflict(s)?`)
+  const confirmed = await confirm.confirm(`Accept modified text for all ${remaining.length} remaining change(s)?`)
   if (!confirmed) return
   remaining.forEach(c => { c.resolved = true; c.resolvedWith = 'modified' })
   selectedConflict.value = null
-  alert.showSuccess(`Accepted modified for ${remaining.length} conflict(s)`)
+  alert.showSuccess(`Accepted modified for ${remaining.length} change(s)`)
 }
 
 // Check if conflict is resolved
@@ -981,9 +981,14 @@ const saveResult = async () => {
     alert.showError('Please login to save results')
     return
   }
-  
+
   if (!originalText.value.trim() && !modifiedText.value.trim()) {
     alert.showError('Please enter text in at least one field')
+    return
+  }
+
+  if (conflictCount.value > 0) {
+    alert.showError(`Please resolve all ${conflictCount.value} remaining change(s) before saving`)
     return
   }
   
