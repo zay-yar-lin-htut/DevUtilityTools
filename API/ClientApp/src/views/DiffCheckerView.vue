@@ -195,25 +195,24 @@ Line 2 modified</pre>
           
           <!-- Conflict Count -->
           <div class="flex items-center gap-3 flex-wrap">
-            <div v-if="conflictCount > 0" class="px-4 py-2 bg-yellow-50 rounded-lg border border-yellow-200">
-              <span class="text-yellow-800 font-medium">{{ conflictCount }}</span>
-              <span class="text-yellow-700"> change(s) remaining</span>
+            <div v-if="conflictCount > 0" class="px-3 py-1.5 bg-gray-100 rounded border border-gray-300 text-sm text-gray-600">
+              <span class="font-medium text-gray-800">{{ conflictCount }}</span> change(s) remaining
             </div>
-            <div v-if="conflictCount === 0" class="px-4 py-2 bg-green-50 rounded-lg border border-green-200">
-              <span class="text-green-800 font-medium">All changes resolved!</span>
+            <div v-if="conflictCount === 0" class="px-3 py-1.5 bg-gray-100 rounded border border-gray-300 text-sm text-gray-600">
+              All changes resolved
             </div>
             <!-- Bulk-resolve buttons — only shown when multiple conflicts remain -->
             <template v-if="conflictCount > 1">
               <button
                 @click="acceptAllOriginal"
-                class="px-3 py-1.5 text-sm font-medium bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                class="px-3 py-1.5 text-sm font-medium bg-white text-gray-700 rounded border border-gray-300 hover:bg-gray-50 transition-colors"
                 title="Resolve all remaining changes by keeping original text"
               >
                 Accept All → Original
               </button>
               <button
                 @click="acceptAllModified"
-                class="px-3 py-1.5 text-sm font-medium bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                class="px-3 py-1.5 text-sm font-medium bg-white text-gray-700 rounded border border-gray-300 hover:bg-gray-50 transition-colors"
                 title="Resolve all remaining changes by keeping modified text"
               >
                 Accept All ← Modified
@@ -241,7 +240,7 @@ Line 2 modified</pre>
             </div>
             <div 
               class="overflow-auto font-mono text-base"
-              style="height: 40rem; line-height: 1.5rem;"
+              style="height: 40rem; line-height: 2.25rem;"
               ref="compareOriginalPanel"
               @scroll="syncCompareScrollOriginal"
             >
@@ -251,12 +250,13 @@ Line 2 modified</pre>
                   <div
                     v-for="(row, idx) in seg.rows"
                     :key="seg.segStartIdx + idx"
-                    :class="selectedRowIdx === seg.segStartIdx + idx ? 'bg-yellow-100' : (seg.segStartIdx + idx) % 2 === 0 ? 'bg-white' : 'bg-gray-50'"
+                    :class="selectedRowIdx === seg.segStartIdx + idx ? 'bg-blue-50' : (seg.segStartIdx + idx) % 2 === 0 ? 'bg-white' : 'bg-gray-50'"
+                    style="height: 2.25rem;"
                     @click="handleRowClick(seg.segStartIdx + idx, null)"
                   >
-                    <div class="flex">
-                      <span class="w-12 flex-shrink-0 text-right pr-2 text-gray-400 select-none bg-gray-100">{{ row.origLineNum }}</span>
-                      <span class="flex-1 p-1" style="white-space: pre;">{{ row.origLine }}</span>
+                    <div class="flex h-full items-center">
+                      <span class="w-12 flex-shrink-0 text-right pr-2 text-gray-400 select-none bg-gray-100 self-stretch flex items-center justify-end">{{ row.origLineNum }}</span>
+                      <span class="flex-1 px-1 truncate" style="white-space: pre;">{{ row.origLine }}</span>
                     </div>
                   </div>
                 </template>
@@ -265,7 +265,7 @@ Line 2 modified</pre>
                 <div
                   v-else
                   :class="[
-                    isConflictResolved(seg.conflictId!) ? 'border-l-4 border-blue-400' : 'border-l-4 border-red-500',
+                    isConflictResolved(seg.conflictId!) ? 'border-l-4 border-gray-300' : 'border-l-4 border-orange-400',
                     'mb-0.5'
                   ]"
                 >
@@ -273,45 +273,66 @@ Line 2 modified</pre>
                     <!-- Filler row: insert row has no orig line -->
                     <div
                       v-if="row.origLine === null"
-                      :class="['flex', selectedRowIdx === seg.segStartIdx + idx ? 'bg-yellow-100' : 'bg-gray-300']"
-                      style="height: 1.5rem;"
+                      :class="[selectedRowIdx === seg.segStartIdx + idx ? 'bg-blue-50' : 'filler-stripe']"
+                      style="height: 2.25rem;"
                       @click.stop="handleRowClick(seg.segStartIdx + idx, seg.conflictId)"
                     >
-                      <span class="w-12 flex-shrink-0"></span>
-                      <span class="flex-1"></span>
+                      <div class="flex h-full items-center">
+                        <span class="w-12 flex-shrink-0 self-stretch filler-stripe-gutter"></span>
+                        <span class="flex-1"></span>
+                      </div>
                     </div>
                     <!-- Content row: delete or replace -->
                     <div
                       v-else
-                      :class="selectedRowIdx === seg.segStartIdx + idx ? 'bg-yellow-100' : (isConflictResolved(seg.conflictId!) ? '' : 'bg-red-100 text-red-800')"
+                      :class="selectedRowIdx === seg.segStartIdx + idx ? 'bg-blue-50' : (isConflictResolved(seg.conflictId!) ? '' : 'bg-red-50')"
+                      style="height: 2.25rem;"
                       @click.stop="handleRowClick(seg.segStartIdx + idx, seg.conflictId)"
                     >
-                      <div class="flex">
-                        <span class="w-12 flex-shrink-0 text-right pr-2 text-gray-400 select-none bg-gray-100">{{ row.origLineNum }}</span>
-                        <span class="flex-1 p-1" style="white-space: pre;">
+                      <div class="flex h-full items-center">
+                        <span class="w-12 flex-shrink-0 text-right pr-2 text-gray-400 select-none bg-gray-100 self-stretch flex items-center justify-end">{{ row.origLineNum }}</span>
+                        <span class="flex-1 px-1 truncate" style="white-space: pre;">
                           <template v-if="!isConflictResolved(seg.conflictId!) && row.type === 'replace'">
                             <template v-for="(s, si) in getCharDiff(row.origLine, row.modLine!, 'orig')" :key="si">
-                              <span :class="s.isDiff ? 'bg-red-300 font-semibold' : ''" style="white-space: pre;">{{ s.text }}</span>
+                              <span :class="s.isDiff ? 'bg-red-200 font-semibold' : ''" style="white-space: pre;">{{ s.text }}</span>
                             </template>
                           </template>
                           <template v-else>{{ row.origLine }}</template>
                         </span>
-                        <span v-if="idx === 0 && !isConflictResolved(seg.conflictId!)" class="text-sm text-blue-600 mr-2 self-center">click</span>
                       </div>
                     </div>
                   </div>
 
-                  <!-- Accept Original button -->
-                  <div
-                    v-if="selectedConflict === seg.conflictId && !isConflictResolved(seg.conflictId!)"
-                    class="p-2 bg-red-50"
-                  >
-                    <button
-                      @click.stop="acceptOriginal(seg.conflictId!)"
-                      class="w-full px-3 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors"
-                    >
-                      Accept Original >
-                    </button>
+                  <!-- Orig panel action bar -->
+                  <div v-if="selectedConflict === seg.conflictId">
+                    <!-- Unresolved: show accept button -->
+                    <div v-if="!isConflictResolved(seg.conflictId!)" class="p-2 bg-gray-50 border-t border-gray-200">
+                      <button
+                        @click.stop="acceptOriginal(seg.conflictId!)"
+                        class="w-full px-3 py-1.5 bg-red-50 text-red-700 text-sm rounded border border-red-300 hover:bg-red-100 transition-colors"
+                      >
+                        Keep Original
+                      </button>
+                    </div>
+                    <!-- Resolved: show current state + change / undo options -->
+                    <div v-else class="p-2 bg-gray-50 border-t border-gray-200 flex flex-col gap-1">
+                      <span class="text-xs text-gray-500">Using: <span class="font-medium text-gray-700">{{ conflicts.find(c => c.id === seg.conflictId)?.resolvedWith === 'original' ? 'Original' : 'Modified' }}</span></span>
+                      <div class="flex gap-1">
+                        <button
+                          v-if="conflicts.find(c => c.id === seg.conflictId)?.resolvedWith !== 'original'"
+                          @click.stop="acceptOriginal(seg.conflictId!)"
+                          class="flex-1 px-3 py-1.5 bg-red-50 text-red-700 text-sm rounded border border-red-300 hover:bg-red-100 transition-colors"
+                        >
+                          Keep Original
+                        </button>
+                        <button
+                          @click.stop="unresolveConflict(seg.conflictId!)"
+                          class="px-3 py-1.5 bg-white text-gray-500 text-sm rounded border border-gray-200 hover:bg-gray-100 transition-colors"
+                        >
+                          Undo
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </template>
@@ -326,7 +347,7 @@ Line 2 modified</pre>
             </div>
             <div 
               class="overflow-auto font-mono text-base"
-              style="height: 40rem; line-height: 1.5rem;"
+              style="height: 40rem; line-height: 2.25rem;"
               ref="compareModifiedPanel"
               @scroll="syncCompareScrollModified"
             >
@@ -336,12 +357,13 @@ Line 2 modified</pre>
                   <div
                     v-for="(row, idx) in seg.rows"
                     :key="seg.segStartIdx + idx"
-                    :class="selectedRowIdx === seg.segStartIdx + idx ? 'bg-yellow-100' : (seg.segStartIdx + idx) % 2 === 0 ? 'bg-white' : 'bg-gray-50'"
+                    :class="selectedRowIdx === seg.segStartIdx + idx ? 'bg-blue-50' : (seg.segStartIdx + idx) % 2 === 0 ? 'bg-white' : 'bg-gray-50'"
+                    style="height: 2.25rem;"
                     @click="handleRowClick(seg.segStartIdx + idx, null)"
                   >
-                    <div class="flex">
-                      <span class="w-12 flex-shrink-0 text-right pr-2 text-gray-400 select-none bg-gray-100">{{ row.modLineNum }}</span>
-                      <span class="flex-1 p-1" style="white-space: pre;">{{ row.modLine }}</span>
+                    <div class="flex h-full items-center">
+                      <span class="w-12 flex-shrink-0 text-right pr-2 text-gray-400 select-none bg-gray-100 self-stretch flex items-center justify-end">{{ row.modLineNum }}</span>
+                      <span class="flex-1 px-1 truncate" style="white-space: pre;">{{ row.modLine }}</span>
                     </div>
                   </div>
                 </template>
@@ -350,7 +372,7 @@ Line 2 modified</pre>
                 <div
                   v-else
                   :class="[
-                    isConflictResolved(seg.conflictId!) ? 'border-l-4 border-blue-400' : 'border-l-4 border-green-500',
+                    isConflictResolved(seg.conflictId!) ? 'border-l-4 border-gray-300' : 'border-l-4 border-orange-400',
                     'mb-0.5'
                   ]"
                 >
@@ -358,45 +380,66 @@ Line 2 modified</pre>
                     <!-- Filler row: delete row has no mod line -->
                     <div
                       v-if="row.modLine === null"
-                      :class="['flex', selectedRowIdx === seg.segStartIdx + idx ? 'bg-yellow-100' : 'bg-gray-300']"
-                      style="height: 1.5rem;"
+                      :class="[selectedRowIdx === seg.segStartIdx + idx ? 'bg-blue-50' : 'filler-stripe']"
+                      style="height: 2.25rem;"
                       @click.stop="handleRowClick(seg.segStartIdx + idx, seg.conflictId)"
                     >
-                      <span class="w-12 flex-shrink-0"></span>
-                      <span class="flex-1"></span>
+                      <div class="flex h-full items-center">
+                        <span class="w-12 flex-shrink-0 self-stretch filler-stripe-gutter"></span>
+                        <span class="flex-1"></span>
+                      </div>
                     </div>
                     <!-- Content row: insert or replace -->
                     <div
                       v-else
-                      :class="selectedRowIdx === seg.segStartIdx + idx ? 'bg-yellow-100' : (isConflictResolved(seg.conflictId!) ? '' : 'bg-green-100 text-green-800')"
+                      :class="selectedRowIdx === seg.segStartIdx + idx ? 'bg-blue-50' : (isConflictResolved(seg.conflictId!) ? '' : 'bg-green-50')"
+                      style="height: 2.25rem;"
                       @click.stop="handleRowClick(seg.segStartIdx + idx, seg.conflictId)"
                     >
-                      <div class="flex">
-                        <span class="w-12 flex-shrink-0 text-right pr-2 text-gray-400 select-none bg-gray-100">{{ row.modLineNum }}</span>
-                        <span class="flex-1 p-1" style="white-space: pre;">
+                      <div class="flex h-full items-center">
+                        <span class="w-12 flex-shrink-0 text-right pr-2 text-gray-400 select-none bg-gray-100 self-stretch flex items-center justify-end">{{ row.modLineNum }}</span>
+                        <span class="flex-1 px-1 truncate" style="white-space: pre;">
                           <template v-if="!isConflictResolved(seg.conflictId!) && row.type === 'replace'">
                             <template v-for="(s, si) in getCharDiff(row.origLine!, row.modLine, 'mod')" :key="si">
-                              <span :class="s.isDiff ? 'bg-green-300 font-semibold' : ''" style="white-space: pre;">{{ s.text }}</span>
+                              <span :class="s.isDiff ? 'bg-green-200 font-semibold' : ''" style="white-space: pre;">{{ s.text }}</span>
                             </template>
                           </template>
                           <template v-else>{{ row.modLine }}</template>
                         </span>
-                        <span v-if="idx === 0 && !isConflictResolved(seg.conflictId!)" class="text-sm text-blue-600 mr-2 self-center">click</span>
                       </div>
                     </div>
                   </div>
 
-                  <!-- Accept Modified button -->
-                  <div
-                    v-if="selectedConflict === seg.conflictId && !isConflictResolved(seg.conflictId!)"
-                    class="p-2 bg-green-50"
-                  >
-                    <button
-                      @click.stop="acceptModified(seg.conflictId!)"
-                      class="w-full px-3 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
-                    >
-                      < Accept Modified
-                    </button>
+                  <!-- Mod panel action bar -->
+                  <div v-if="selectedConflict === seg.conflictId">
+                    <!-- Unresolved: show accept button -->
+                    <div v-if="!isConflictResolved(seg.conflictId!)" class="p-2 bg-gray-50 border-t border-gray-200">
+                      <button
+                        @click.stop="acceptModified(seg.conflictId!)"
+                        class="w-full px-3 py-1.5 bg-green-50 text-green-700 text-sm rounded border border-green-300 hover:bg-green-100 transition-colors"
+                      >
+                        Keep Modified
+                      </button>
+                    </div>
+                    <!-- Resolved: show current state + change / undo options -->
+                    <div v-else class="p-2 bg-gray-50 border-t border-gray-200 flex flex-col gap-1">
+                      <span class="text-xs text-gray-500">Using: <span class="font-medium text-gray-700">{{ conflicts.find(c => c.id === seg.conflictId)?.resolvedWith === 'modified' ? 'Modified' : 'Original' }}</span></span>
+                      <div class="flex gap-1">
+                        <button
+                          v-if="conflicts.find(c => c.id === seg.conflictId)?.resolvedWith !== 'modified'"
+                          @click.stop="acceptModified(seg.conflictId!)"
+                          class="flex-1 px-3 py-1.5 bg-green-50 text-green-700 text-sm rounded border border-green-300 hover:bg-green-100 transition-colors"
+                        >
+                          Keep Modified
+                        </button>
+                        <button
+                          @click.stop="unresolveConflict(seg.conflictId!)"
+                          class="px-3 py-1.5 bg-white text-gray-500 text-sm rounded border border-gray-200 hover:bg-gray-100 transition-colors"
+                        >
+                          Undo
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </template>
@@ -417,7 +460,7 @@ Line 2 modified</pre>
             <div
               ref="compareResultPanel"
               class="overflow-auto font-mono text-base bg-gray-50"
-              style="height: 18rem; line-height: 1.5rem;"
+              style="height: 18rem; line-height: 2.25rem;"
               @scroll="syncCompareScrollResult"
             >
               <div v-if="mergedResult.length === 0" class="p-4 text-gray-400 italic">
@@ -427,12 +470,13 @@ Line 2 modified</pre>
                 <div
                   v-for="(line, index) in mergedResult"
                   :key="index"
-                  :class="mergedResultMap[index] === selectedRowIdx ? 'bg-yellow-100' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50'"
+                  :class="mergedResultMap[index] === selectedRowIdx ? 'bg-blue-50' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50'"
+                  style="height: 2.25rem;"
                   @click="handleRowClick(mergedResultMap[index], null)"
                 >
-                  <div class="flex">
-                    <span class="w-12 flex-shrink-0 text-right pr-2 text-gray-400 select-none bg-gray-100">{{ index + 1 }}</span>
-                    <span class="flex-1 p-1" style="white-space: pre;">{{ line }}</span>
+                  <div class="flex h-full items-center">
+                    <span class="w-12 flex-shrink-0 text-right pr-2 text-gray-400 select-none bg-gray-100 self-stretch flex items-center justify-end">{{ index + 1 }}</span>
+                    <span class="flex-1 px-1 truncate" style="white-space: pre;">{{ line }}</span>
                   </div>
                 </div>
               </template>
@@ -613,10 +657,17 @@ const selectedRowIdx   = ref<number | null>(null)
 const alignedRows = ref<AlignedRow[]>([])
 let conflictIdCounter = 0
 
+// Strip trailing empty strings produced by a trailing newline in the textarea
+const splitLines = (text: string): string[] => {
+  const lines = text.split('\n')
+  while (lines.length > 1 && lines[lines.length - 1] === '') lines.pop()
+  return lines
+}
+
 // LCS-based line diff — builds an array of AlignedRow (called by compareDiff)
 const lcsLineDiff = (): AlignedRow[] => {
-  const origLines = originalText.value.split('\n')
-  const modLines  = modifiedText.value.split('\n')
+  const origLines = splitLines(originalText.value)
+  const modLines  = splitLines(modifiedText.value)
   const m = origLines.length, n = modLines.length
 
   // Build DP table
@@ -813,11 +864,11 @@ const toggleConflict = (conflictId: number) => {
   }
 }
 
-// Click a row: highlight it across all three panels; also toggles change block if unresolved
+// Click a row: highlight it across all three panels; also toggles change block (resolved or not)
 const handleRowClick = (rowIdx: number | null, conflictId: number | null) => {
   if (rowIdx === null) return
   selectedRowIdx.value = rowIdx
-  if (conflictId !== null && !isConflictResolved(conflictId)) toggleConflict(conflictId)
+  if (conflictId !== null) toggleConflict(conflictId)
 }
 
 // Accept original for a conflict block
@@ -839,6 +890,17 @@ const acceptModified = (conflictId: number) => {
     conflict.resolvedWith = 'modified'
     selectedConflict.value = null
     alert.showSuccess('Accepted modified text')
+  }
+}
+
+// Undo a resolved conflict — revert to unresolved
+const unresolveConflict = (conflictId: number) => {
+  const conflict = conflicts.value.find(c => c.id === conflictId)
+  if (conflict) {
+    conflict.resolved = false
+    conflict.resolvedWith = null
+    selectedConflict.value = null
+    alert.showSuccess('Change reopened')
   }
 }
 
@@ -1031,5 +1093,28 @@ const saveResult = async () => {
 */
 .gutter-inner {
   will-change: transform;
+}
+
+/* Diagonal stripe pattern for filler (empty placeholder) rows */
+.filler-stripe {
+  background-color: #f3f4f6;
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 5px,
+    rgba(0, 0, 0, 0.07) 5px,
+    rgba(0, 0, 0, 0.07) 10px
+  );
+}
+
+.filler-stripe-gutter {
+  background-color: #e5e7eb;
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 5px,
+    rgba(0, 0, 0, 0.07) 5px,
+    rgba(0, 0, 0, 0.07) 10px
+  );
 }
 </style>
