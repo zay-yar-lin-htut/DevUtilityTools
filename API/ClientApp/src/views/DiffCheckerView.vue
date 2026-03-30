@@ -168,14 +168,29 @@
 
         <!-- ── Example ──────────────────────────────────────────────────────── -->
         <details class="mt-3">
-          <summary class="cursor-pointer text-sm text-gray-400 select-none hover:text-gray-600">Show example</summary>
-          <pre @click="loadExample" class="mt-2 bg-gray-100 p-3 rounded text-sm cursor-pointer hover:bg-gray-200 transition-colors whitespace-pre-wrap">Original:
-Line 1
-Line 2
+          <summary class="cursor-pointer text-sm text-gray-400 select-none hover:text-gray-600 outline-none">
+            Show example
+          </summary>
+          
+          <div @click="loadExample" class="mt-2 bg-gray-100 p-3 rounded text-sm cursor-pointer hover:bg-gray-200 transition-colors flex gap-4 overflow-hidden">
+            <div class="flex-1 pr-4 border-r border-gray-300">
+              <pre class="whitespace-pre-wrap">
+                Original :
 
-Modified:
-Line 1
-Line 2 modified</pre>
+                Line 1
+                Line 2
+              </pre>
+            </div>
+
+            <div class="flex-1">
+              <pre class="whitespace-pre-wrap">
+                Modified :
+
+                Line 1
+                Line 2 modified
+              </pre>
+            </div>
+          </div>
         </details>
       </div>
 
@@ -250,7 +265,7 @@ Line 2 modified</pre>
                   <div
                     v-for="(row, idx) in seg.rows"
                     :key="seg.segStartIdx + idx"
-                    :class="selectedRowIdx === seg.segStartIdx + idx ? 'bg-blue-50' : (seg.segStartIdx + idx) % 2 === 0 ? 'bg-white' : 'bg-gray-50'"
+                    :class="selectedRowIdx === seg.segStartIdx + idx ? 'bg-blue-50' : 'bg-white'"
                     style="height: 2.25rem;"
                     @click="handleRowClick(seg.segStartIdx + idx, null)"
                   >
@@ -357,7 +372,7 @@ Line 2 modified</pre>
                   <div
                     v-for="(row, idx) in seg.rows"
                     :key="seg.segStartIdx + idx"
-                    :class="selectedRowIdx === seg.segStartIdx + idx ? 'bg-blue-50' : (seg.segStartIdx + idx) % 2 === 0 ? 'bg-white' : 'bg-gray-50'"
+                    :class="selectedRowIdx === seg.segStartIdx + idx ? 'bg-blue-50' : 'bg-white'"
                     style="height: 2.25rem;"
                     @click="handleRowClick(seg.segStartIdx + idx, null)"
                   >
@@ -470,7 +485,7 @@ Line 2 modified</pre>
                 <div
                   v-for="(line, index) in mergedResult"
                   :key="index"
-                  :class="mergedResultMap[index] === selectedRowIdx ? 'bg-blue-50' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50'"
+                  :class="mergedResultMap[index] === selectedRowIdx ? 'bg-blue-50' : 'bg-white'"
                   style="height: 2.25rem;"
                   @click="handleRowClick(mergedResultMap[index], null)"
                 >
@@ -867,7 +882,11 @@ const toggleConflict = (conflictId: number) => {
 // Click a row: highlight it across all three panels; also toggles change block (resolved or not)
 const handleRowClick = (rowIdx: number | null, conflictId: number | null) => {
   if (rowIdx === null) return
-  selectedRowIdx.value = rowIdx
+  if (selectedRowIdx.value === rowIdx) {
+    selectedRowIdx.value = null
+  } else {
+    selectedRowIdx.value = rowIdx
+  }
   if (conflictId !== null) toggleConflict(conflictId)
 }
 
