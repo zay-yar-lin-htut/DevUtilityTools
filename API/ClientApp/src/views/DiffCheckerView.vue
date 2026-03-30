@@ -582,10 +582,6 @@ onBeforeUnmount(() => {
   if (gaugeEl) { document.body.removeChild(gaugeEl); gaugeEl = null }
 })
 
-// Arrays for compare view
-const originalLinesArr = computed(() => originalText.value.split('\n'))
-const modifiedLinesArr = computed(() => modifiedText.value.split('\n'))
-
 // One aligned row shared by both panels (LCS-based)
 interface AlignedRow {
   type: 'equal' | 'delete' | 'insert' | 'replace'
@@ -872,32 +868,6 @@ const acceptAllModified = async () => {
 const isConflictResolved = (conflictId: number) => {
   const conflict = conflicts.value.find(c => c.id === conflictId)
   return conflict?.resolved || false
-}
-
-// Get class for conflict block container
-const getConflictBlockClass = (conflictId: number, side: 'orig' | 'mod') => {
-  const conflict = conflicts.value.find(c => c.id === conflictId)
-  if (!conflict) return ''
-  
-  if (conflict.resolved) {
-    if ((side === 'orig' && conflict.resolvedWith === 'original') ||
-        (side === 'mod' && conflict.resolvedWith === 'modified')) {
-      return 'border-blue-500'
-    }
-    return 'border-gray-300 opacity-50'
-  }
-  return ''
-}
-
-// Get class for lines inside conflict block
-const getConflictLineClass = (conflictId: number, side: 'orig' | 'mod') => {
-  const conflict = conflicts.value.find(c => c.id === conflictId)
-  if (!conflict) return ''
-  
-  if (conflict.resolved) {
-    return '' // Normal styling when resolved
-  }
-  return side === 'orig' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
 }
 
 // Sync scroll for input view — just update the reactive offset; the gutter uses transform:translateY
