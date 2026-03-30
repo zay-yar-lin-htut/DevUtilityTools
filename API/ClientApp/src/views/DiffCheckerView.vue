@@ -672,10 +672,11 @@ const selectedRowIdx   = ref<number | null>(null)
 const alignedRows = ref<AlignedRow[]>([])
 let conflictIdCounter = 0
 
-// Strip trailing empty strings produced by a trailing newline in the textarea
+// Strip at most ONE trailing empty string produced by a trailing newline in the textarea.
+// We must not strip more than one, otherwise intentional trailing empty lines are lost.
 const splitLines = (text: string): string[] => {
   const lines = text.split('\n')
-  while (lines.length > 1 && lines[lines.length - 1] === '') lines.pop()
+  if (lines.length > 1 && lines[lines.length - 1] === '') lines.pop()
   return lines
 }
 
