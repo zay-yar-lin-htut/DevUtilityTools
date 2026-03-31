@@ -65,7 +65,6 @@
               readonly
               @scroll="syncScrollOutput"
               class="tool-textarea"
-              style="background: #f9fafb;"
               placeholder="Result will appear here..."
             ></textarea>
           </div>

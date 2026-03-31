@@ -34,7 +34,7 @@
           <div class="mb-2">
             <label class="tool-label">Preview</label>
           </div>
-          <div class="tool-input-output-container" style="background:#f9fafb;">
+          <div class="tool-input-output-container">
             <div
               class="flex-1 p-4 overflow-auto prose prose-sm max-w-none markdown-preview"
               v-html="output"
@@ -270,4 +270,20 @@ const saveResult = async () => {
   border-top: 1px solid #d1d5db;
   margin: 1rem 0;
 }
+
+/* Dark mode */
+:global(.dark) .markdown-preview :deep(h1)                    { color: #f1f5f9; }
+:global(.dark) .markdown-preview :deep(h2)                    { color: #e2e8f0; }
+:global(.dark) .markdown-preview :deep(h3),
+:global(.dark) .markdown-preview :deep(h4),
+:global(.dark) .markdown-preview :deep(h5),
+:global(.dark) .markdown-preview :deep(h6)                    { color: #cbd5e1; }
+:global(.dark) .markdown-preview :deep(code)                  { background-color: #1c2a3a; color: #e2e8f0; }
+:global(.dark) .markdown-preview :deep(blockquote)            { border-left-color: #374151; color: #94a3b8; }
+:global(.dark) .markdown-preview :deep(hr)                    { border-top-color: #374151; }
+:global(.dark) .markdown-preview :deep(p),
+:global(.dark) .markdown-preview :deep(li),
+:global(.dark) .markdown-preview :deep(ol li),
+:global(.dark) .markdown-preview :deep(strong),
+:global(.dark) .markdown-preview :deep(em)                    { color: #e2e8f0; }
 </style>

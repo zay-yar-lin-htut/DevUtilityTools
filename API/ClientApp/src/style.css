@@ -275,3 +275,132 @@ a {
 @media (prefers-reduced-motion: reduce) {
   *, .orb, .reveal, .fade-up, .card-3d { animation: none !important; transition: none !important; }
 }
+
+/* ── Dark mode transition ────────────────────────────────────────────── */
+/* Applied via JS just before toggling the class so the transition fires,
+   then removed to avoid sluggishness during normal interactions.        */
+html.theme-transitioning,
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+  transition:
+    background-color 0.35s ease,
+    background-image 0.35s ease,
+    border-color     0.35s ease,
+    color            0.35s ease,
+    box-shadow       0.35s ease,
+    fill             0.35s ease,
+    stroke           0.35s ease !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   DARK MODE
+   Toggle by adding/removing the `dark` class on <html>.
+   ══════════════════════════════════════════════════════════════════════ */
+/* Root variables */
+.dark {
+  --clr-bg:      #0d1117;
+  --clr-surface: rgba(22, 27, 39, 0.92);
+  --clr-ink:     #e2e8f0;
+  color-scheme:  dark;
+}
+
+html.dark { background: #0d1117; color: #e2e8f0; }
+
+/* Glass nav / footer */
+.dark .glass-card {
+  background: rgba(16, 20, 32, 0.95);
+  border-color: rgba(255,255,255,0.07);
+  box-shadow: 0 1px 0 0 rgba(255,255,255,0.05) inset, 0 8px 32px rgba(0,0,0,0.5);
+}
+
+/* Generic card */
+.dark .card {
+  background: rgba(22, 33, 50, 0.9);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+}
+
+/* Secondary button */
+.dark .btn-secondary {
+  background: #1e2635;
+  color: #cbd5e1;
+  border-color: rgba(99,102,241,0.28);
+}
+.dark .btn-secondary:hover { background: #263044; }
+.dark .btn-ghost { color: #94a3b8; }
+
+/* ── Tool editor components ─────────────────────────────────────────── */
+.dark .tool-input-output-container { border-color: #2d3748; background: #0d1117; }
+.dark .tool-gutter                 { background: #161b27; color: #4b5563; }
+.dark .tool-textarea               { background: #0d1117; color: #e2e8f0; caret-color: #60a5fa; }
+.dark .tool-textarea:focus         { box-shadow: inset 0 0 0 2px #3b82f6; }
+.dark .tool-output                 { background: #0d1117; color: #e2e8f0; }
+.dark .tool-label                  { color: #d1d5db; }
+.dark .tool-copy-btn               { color: #6b7280; }
+.dark .tool-copy-btn:hover         { color: #60a5fa; background: rgba(59,130,246,0.1); }
+
+/* Scrollbars */
+.dark ::-webkit-scrollbar-thumb       { background: #374151; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+
+/* ── Tailwind utility overrides ─────────────────────────────────────── */
+/* Backgrounds */
+.dark .bg-white    { background-color: #1a2233; }
+.dark .bg-gray-50  { background-color: #141e2d; }
+.dark .bg-gray-100 { background-color: #1c2a3a; }
+.dark .bg-gray-200 { background-color: #263347; }
+.dark .bg-gray-300 { background-color: #374151; }
+
+/* Hover backgrounds */
+.dark .hover\:bg-gray-50:hover  { background-color: #141e2d; }
+.dark .hover\:bg-gray-100:hover { background-color: #1c2a3a; }
+.dark .hover\:bg-gray-200:hover { background-color: #263347; }
+
+/* Diff / semantic backgrounds */
+.dark .bg-red-50    { background-color: #2d1515; }
+.dark .bg-green-50  { background-color: #0f2218; }
+.dark .bg-blue-50   { background-color: #0d1f35; }
+.dark .bg-red-100   { background-color: #451a1a; }
+.dark .bg-green-100 { background-color: #14452e; }
+.dark .bg-red-200   { background-color: #7f1d1d; }
+.dark .bg-green-200 { background-color: #14532d; }
+
+/* Text */
+.dark .text-gray-800 { color: #f1f5f9; }
+.dark .text-gray-700 { color: #e2e8f0; }
+.dark .text-gray-600 { color: #cbd5e1; }
+.dark .text-gray-500 { color: #94a3b8; }
+.dark .text-gray-400 { color: #64748b; }
+.dark .hover\:text-gray-600:hover { color: #cbd5e1; }
+.dark .hover\:text-gray-800:hover { color: #f1f5f9; }
+.dark .hover\:text-gray-900:hover { color: #f8fafc; }
+
+/* Status text */
+.dark .text-green-700 { color: #34d399; }
+.dark .text-green-800 { color: #6ee7b7; }
+.dark .text-red-700   { color: #f87171; }
+.dark .text-red-800   { color: #fca5a5; }
+.dark .text-blue-600  { color: #60a5fa; }
+
+/* Borders */
+.dark .border-gray-300  { border-color: #374151; }
+.dark .border-gray-200  { border-color: #2d3748; }
+.dark .border-gray-100  { border-color: #1e2532; }
+.dark .border-red-200   { border-color: #7f1d1d; }
+.dark .border-red-300   { border-color: #991b1b; }
+.dark .border-green-300 { border-color: #14532d; }
+.dark .border-blue-600  { border-color: #3b82f6; }
+.dark .border-orange-400 { border-color: #b45309; }
+
+/* Inputs / selects */
+.dark input:not([type="checkbox"]):not([type="radio"]),
+.dark select {
+  background-color: #161b27;
+  color: #e2e8f0;
+  border-color: #374151;
+}
+.dark input::placeholder,
+.dark textarea::placeholder { color: #4b5563; }
+
+/* Active router-link tab */
+.dark .border-blue-600 { border-color: #3b82f6; }

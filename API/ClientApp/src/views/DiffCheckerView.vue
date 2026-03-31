@@ -280,7 +280,7 @@
                 <div
                   v-else
                   :class="[
-                    isConflictResolved(seg.conflictId!) ? 'border-l-4 border-gray-300' : 'border-l-4 border-orange-400',
+                    isConflictResolved(seg.conflictId!) ? 'border-l-2 border-gray-300' : 'border-l-2 border-orange-400',
                     'mb-0.5'
                   ]"
                 >
@@ -387,7 +387,7 @@
                 <div
                   v-else
                   :class="[
-                    isConflictResolved(seg.conflictId!) ? 'border-l-4 border-gray-300' : 'border-l-4 border-orange-400',
+                    isConflictResolved(seg.conflictId!) ? 'border-l-2 border-gray-300' : 'border-l-2 border-green-400',
                     'mb-0.5'
                   ]"
                 >
@@ -464,37 +464,56 @@
 
         <!-- Result preview at bottom -->
         <div class="mt-6">
-          <div class="flex justify-between items-center mb-2">
-            <label class="block text-gray-700 text-base font-bold">Result Preview</label>
-          </div>
-          <div class="border border-gray-300 rounded-lg overflow-hidden">
-            <div class="bg-gray-100 px-4 py-2 border-b border-gray-300">
-              <span class="font-bold text-gray-700">Merged Result</span>
-              <span class="text-gray-500 text-base ml-2">({{ mergedResult.length }} lines)</span>
-            </div>
-            <div
-              ref="compareResultPanel"
-              class="overflow-auto font-mono text-base bg-gray-50"
-              style="height: 18rem; line-height: 2.25rem;"
-              @scroll="syncCompareScrollResult"
-            >
-              <div v-if="mergedResult.length === 0" class="p-4 text-gray-400 italic">
-                No result yet. Resolve changes to see merged result.
+          <label class="block text-gray-700 text-base font-bold mb-3">Result Preview</label>
+
+          <!-- Two live result panels: Original | Modified -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Original result -->
+            <div class="border border-gray-300 rounded-lg overflow-hidden">
+              <div class="bg-gray-100 px-4 py-2 border-b border-gray-300">
+                <span class="font-bold text-gray-700">Original</span>
+                <span class="text-gray-500 text-base ml-2">({{ originalLiveResult.length }} lines)</span>
               </div>
-              <template v-else>
+              <div
+                class="overflow-auto font-mono text-base bg-gray-50"
+                style="height: 14rem; line-height: 2.25rem;"
+              >
                 <div
-                  v-for="(line, index) in mergedResult"
+                  v-for="(line, index) in originalLiveResult"
                   :key="index"
-                  :class="mergedResultMap[index] === selectedRowIdx ? 'bg-blue-50' : 'bg-white'"
+                  class="bg-white"
                   style="height: 2.25rem;"
-                  @click="handleRowClick(mergedResultMap[index], null)"
                 >
                   <div class="flex h-full items-center">
                     <span class="w-12 flex-shrink-0 text-right pr-2 text-gray-400 select-none bg-gray-100 self-stretch flex items-center justify-end">{{ index + 1 }}</span>
                     <span class="flex-1 px-1 truncate" style="white-space: pre;">{{ line }}</span>
                   </div>
                 </div>
-              </template>
+              </div>
+            </div>
+
+            <!-- Modified result -->
+            <div class="border border-gray-300 rounded-lg overflow-hidden">
+              <div class="bg-gray-100 px-4 py-2 border-b border-gray-300">
+                <span class="font-bold text-gray-700">Modified</span>
+                <span class="text-gray-500 text-base ml-2">({{ modifiedLiveResult.length }} lines)</span>
+              </div>
+              <div
+                class="overflow-auto font-mono text-base bg-gray-50"
+                style="height: 14rem; line-height: 2.25rem;"
+              >
+                <div
+                  v-for="(line, index) in modifiedLiveResult"
+                  :key="index"
+                  class="bg-white"
+                  style="height: 2.25rem;"
+                >
+                  <div class="flex h-full items-center">
+                    <span class="w-12 flex-shrink-0 text-right pr-2 text-gray-400 select-none bg-gray-100 self-stretch flex items-center justify-end">{{ index + 1 }}</span>
+                    <span class="flex-1 px-1 truncate" style="white-space: pre;">{{ line }}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -506,12 +525,14 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useAuthStore } from '../stores/auth'
+import { useDiffCheckerStore } from '../stores/diffChecker'
 import { savedResultsApi } from '../api/saved'
 import { useAlert } from '../composables/useAlert'
 import { useConfirm } from '../composables/useConfirm'
 import Toolbar from '../components/Toolbar.vue'
 
 const authStore = useAuthStore()
+const diffCheckerStore = useDiffCheckerStore()
 const alert = useAlert()
 const confirm = useConfirm()
 
@@ -532,7 +553,6 @@ const mobileModifiedTextarea = ref<HTMLTextAreaElement | null>(null)
 // Compare panel refs for scrolling
 const compareOriginalPanel = ref<HTMLElement | null>(null)
 const compareModifiedPanel = ref<HTMLElement | null>(null)
-const compareResultPanel   = ref<HTMLElement | null>(null)
 
 // Scroll offsets — drive gutter translateY so sync is always pixel-perfect
 const origScrollTop = ref(0)
@@ -622,6 +642,13 @@ watch(activePanel, async () => { await recomputeOriginalLines(); await recompute
 // ResizeObserver: recompute whenever any textarea changes width (window resize / layout shift)
 let resizeObs: ResizeObserver | null = null
 onMounted(async () => {
+  // Load inputs passed from Saved Results ("Edit Previous" or "Edit Solved")
+  const pending = diffCheckerStore.consume()
+  if (pending) {
+    originalText.value = pending.original
+    modifiedText.value = pending.modified
+  }
+
   await recomputeOriginalLines()
   await recomputeModifiedLines()
   // Re-measure after fonts finish loading (font metrics affect line wrapping)
@@ -806,29 +833,60 @@ const mergedResult = computed(() => {
   return result
 })
 
-// Maps each merged-result line index → its alignedRows index (for cross-panel row highlighting)
-const mergedResultMap = computed((): number[] => {
+// Live result lines: equal rows always shown; conflict rows show accepted version when
+// resolved, otherwise fall back to the original/modified side respectively.
+const originalLiveResult = computed((): string[] => {
   if (alignedRows.value.length === 0) return []
-  const map: number[] = []
+  const result: string[] = []
   let i = 0
   while (i < alignedRows.value.length) {
     const row = alignedRows.value[i]
     if (row.conflictId === null) {
-      map.push(i); i++
+      result.push(row.origLine!)
+      i++
     } else {
       const cid = row.conflictId
       const conflict = conflicts.value.find(c => c.id === cid)
       while (i < alignedRows.value.length && alignedRows.value[i].conflictId === cid) {
+        const r = alignedRows.value[i]
         if (conflict?.resolved) {
-          const r = alignedRows.value[i]
-          if (conflict.resolvedWith === 'original' && r.origLine !== null) map.push(i)
-          else if (conflict.resolvedWith === 'modified' && r.modLine !== null) map.push(i)
+          if (conflict.resolvedWith === 'original' && r.origLine !== null) result.push(r.origLine)
+          else if (conflict.resolvedWith === 'modified' && r.modLine !== null) result.push(r.modLine)
+        } else {
+          if (r.origLine !== null) result.push(r.origLine)
         }
         i++
       }
     }
   }
-  return map
+  return result
+})
+
+const modifiedLiveResult = computed((): string[] => {
+  if (alignedRows.value.length === 0) return []
+  const result: string[] = []
+  let i = 0
+  while (i < alignedRows.value.length) {
+    const row = alignedRows.value[i]
+    if (row.conflictId === null) {
+      result.push(row.modLine!)
+      i++
+    } else {
+      const cid = row.conflictId
+      const conflict = conflicts.value.find(c => c.id === cid)
+      while (i < alignedRows.value.length && alignedRows.value[i].conflictId === cid) {
+        const r = alignedRows.value[i]
+        if (conflict?.resolved) {
+          if (conflict.resolvedWith === 'original' && r.origLine !== null) result.push(r.origLine)
+          else if (conflict.resolvedWith === 'modified' && r.modLine !== null) result.push(r.modLine)
+        } else {
+          if (r.modLine !== null) result.push(r.modLine)
+        }
+        i++
+      }
+    }
+  }
+  return result
 })
 
 // Character-level diff segments
@@ -961,23 +1019,15 @@ const syncScrollModified = () => {
   modScrollTop.value = modifiedTextarea.value?.scrollTop ?? mobileModifiedTextarea.value?.scrollTop ?? 0
 }
 
-// Sync scroll for compare view — keep all three panels in lockstep
+// Sync scroll for compare view — keep both panels in lockstep
 const syncCompareScrollOriginal = () => {
   const top = compareOriginalPanel.value?.scrollTop ?? 0
   if (compareModifiedPanel.value) compareModifiedPanel.value.scrollTop = top
-  if (compareResultPanel.value)   compareResultPanel.value.scrollTop   = top
 }
 
 const syncCompareScrollModified = () => {
   const top = compareModifiedPanel.value?.scrollTop ?? 0
   if (compareOriginalPanel.value) compareOriginalPanel.value.scrollTop = top
-  if (compareResultPanel.value)   compareResultPanel.value.scrollTop   = top
-}
-
-const syncCompareScrollResult = () => {
-  const top = compareResultPanel.value?.scrollTop ?? 0
-  if (compareOriginalPanel.value) compareOriginalPanel.value.scrollTop = top
-  if (compareModifiedPanel.value) compareModifiedPanel.value.scrollTop = top
 }
 
 // Compare diff — LCS-based with filler row alignment
@@ -1068,17 +1118,12 @@ const saveResult = async () => {
     alert.showError('Please enter text in at least one field')
     return
   }
-
-  if (conflictCount.value > 0) {
-    alert.showError(`Please resolve all ${conflictCount.value} remaining change(s) before saving`)
-    return
-  }
   
   try {
     await savedResultsApi.create({
       toolType: 4,
-      input: `Original:\n${originalText.value}\n\nModified:\n${modifiedText.value}`,
-      output: mergedResult.value.join('\n')
+      input: `Original Input:\n${originalText.value}\n\nModified Input:\n${modifiedText.value}`,
+      output: `Original Result:\n${originalLiveResult.value.join('\n')}\n\nModified Result:\n${modifiedLiveResult.value.join('\n')}`
     })
     alert.showSuccess('Saved successfully!')
   } catch (err: any) {
@@ -1135,6 +1180,28 @@ const saveResult = async () => {
     transparent 5px,
     rgba(0, 0, 0, 0.07) 5px,
     rgba(0, 0, 0, 0.07) 10px
+  );
+}
+
+/* Dark mode overrides */
+:global(.dark) .filler-stripe {
+  background-color: #1a2233;
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 5px,
+    rgba(255, 255, 255, 0.04) 5px,
+    rgba(255, 255, 255, 0.04) 10px
+  );
+}
+:global(.dark) .filler-stripe-gutter {
+  background-color: #161b27;
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 5px,
+    rgba(255, 255, 255, 0.04) 5px,
+    rgba(255, 255, 255, 0.04) 10px
   );
 }
 </style>

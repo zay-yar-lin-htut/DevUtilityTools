@@ -84,11 +84,27 @@
         <div class="bg-white rounded-xl p-6 w-full max-w-5xl max-h-[90vh] overflow-auto">
           <div class="flex justify-between items-center mb-5">
             <h2 class="text-2xl font-bold">Diff Checker Detail</h2>
-            <button @click="closeDetail" class="text-gray-500 hover:text-gray-700">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            <div class="flex items-center gap-3">
+              <button
+                @click="editPreviousInputs"
+                class="px-4 py-2 text-sm font-medium bg-white text-gray-700 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors"
+                title="Open original & modified inputs in Diff Checker"
+              >
+                Edit Previous Inputs
+              </button>
+              <button
+                @click="editSolvedInputs"
+                class="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg border border-blue-600 hover:bg-blue-700 transition-colors"
+                title="Open the resolved outputs as new inputs in Diff Checker"
+              >
+                Edit Solved Inputs
+              </button>
+              <button @click="closeDetail" class="text-gray-500 hover:text-gray-700">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
           
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -137,34 +153,48 @@
             </div>
           </div>
           
-          <!-- Diff Result -->
-          <div>
-            <label class="block text-gray-700 text-base font-bold mb-2">Diff Result</label>
-            <div class="relative flex border border-gray-300 rounded-lg overflow-hidden" style="height: 22rem;">
-              <div 
-                class="w-12 text-gray-400 text-sm font-mono p-2 overflow-hidden text-right select-none"
-                style="line-height: 1.5rem;"
-              >
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Original Result -->
+            <div>
+              <label class="block text-gray-700 text-base font-bold mb-2">Original Result</label>
+              <div class="relative flex border border-gray-300 rounded-lg overflow-hidden" style="height: 18rem;">
                 <div 
-                  v-for="n in detailResultLines" 
-                  :key="n" 
-                  :class="n % 2 === 0 ? 'bg-gray-200' : 'bg-gray-100'"
-                  :style="{ height: '1.5rem' }"
-                >{{ n }}</div>
-              </div>
-              <div 
-                class="flex-1 p-2 border-0 bg-gray-50 overflow-auto font-mono text-base whitespace-pre"
-                style="line-height: 1.5rem;"
-              >
-                <div 
-                  v-for="(line, index) in detailDiffLines" 
-                  :key="index"
-                  :class="getDiffLineClass(line)"
-                  :style="{ height: '1.5rem', display: 'flex' }"
+                  class="w-12 text-gray-400 text-sm font-mono p-2 overflow-hidden text-right select-none"
+                  style="line-height: 1.5rem;"
                 >
-                  <span class="w-6 flex-shrink-0">{{ line.prefix }}</span>
-                  <span class="flex-1">{{ line.content }}</span>
+                  <div 
+                    v-for="n in detailOriginalResultLines" 
+                    :key="n" 
+                    :class="n % 2 === 0 ? 'bg-gray-200' : 'bg-gray-100'"
+                    :style="{ height: '1.5rem' }"
+                  >{{ n }}</div>
                 </div>
+                <div 
+                  class="flex-1 p-2 border-0 bg-gray-50 overflow-auto font-mono text-base whitespace-pre"
+                  style="line-height: 1.5rem;"
+                >{{ detailOriginalResult }}</div>
+              </div>
+            </div>
+
+            <!-- Modified Result -->
+            <div>
+              <label class="block text-gray-700 text-base font-bold mb-2">Modified Result</label>
+              <div class="relative flex border border-gray-300 rounded-lg overflow-hidden" style="height: 18rem;">
+                <div 
+                  class="w-12 text-gray-400 text-sm font-mono p-2 overflow-hidden text-right select-none"
+                  style="line-height: 1.5rem;"
+                >
+                  <div 
+                    v-for="n in detailModifiedResultLines" 
+                    :key="n" 
+                    :class="n % 2 === 0 ? 'bg-gray-200' : 'bg-gray-100'"
+                    :style="{ height: '1.5rem' }"
+                  >{{ n }}</div>
+                </div>
+                <div 
+                  class="flex-1 p-2 border-0 bg-gray-50 overflow-auto font-mono text-base whitespace-pre"
+                  style="line-height: 1.5rem;"
+                >{{ detailModifiedResult }}</div>
               </div>
             </div>
           </div>
@@ -176,12 +206,16 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { useDiffCheckerStore } from '../stores/diffChecker'
 import { savedResultsApi } from '../api/saved'
 import { useAlert } from '../composables/useAlert'
 import { useConfirm } from '../composables/useConfirm'
 
+const router = useRouter()
 const authStore = useAuthStore()
+const diffCheckerStore = useDiffCheckerStore()
 const alert = useAlert()
 const confirm = useConfirm()
 
@@ -194,11 +228,6 @@ interface SavedResult {
   createdAt: string
 }
 
-interface DiffLine {
-  prefix: string
-  content: string
-}
-
 const savedResults = ref<SavedResult[]>([])
 const loading = ref(false)
 const showDetail = ref(false)
@@ -206,7 +235,8 @@ const selectedResult = ref<SavedResult | null>(null)
 
 const detailOriginal = ref('')
 const detailModified = ref('')
-const detailOutput = ref('')
+const detailOriginalResult = ref('')
+const detailModifiedResult = ref('')
 
 const toolTypeNames: Record<number, string> = {
   1: 'JSON Formatter',
@@ -231,13 +261,23 @@ const formatDate = (dateStr: string) => {
 }
 
 const getDiffOriginal = (input: string) => {
-  const match = input.match(/^Original:\n([\s\S]*?)(?=\nModified:|$)/)
+  const match = input.match(/^Original(?: Input)?:\n([\s\S]*?)(?=\nModified(?: Input)?:|$)/)
   return match ? match[1].trim() : input
 }
 
 const getDiffModified = (input: string) => {
-  const match = input.match(/\nModified:\n([\s\S]*)$/)
+  const match = input.match(/\nModified(?: Input)?:\n([\s\S]*)$/)
   return match ? match[1].trim() : ''
+}
+
+const getDiffOriginalResult = (output: string) => {
+  const match = output.match(/^Original Result:\n([\s\S]*?)(?=\nModified Result:|$)/)
+  return match ? match[1].trim() : output.trim()
+}
+
+const getDiffModifiedResult = (output: string) => {
+  const match = output.match(/\nModified Result:\n([\s\S]*)$/)
+  return match ? match[1].trim() : output.trim()
 }
 
 const detailOriginalLines = computed(() => {
@@ -250,37 +290,33 @@ const detailModifiedLines = computed(() => {
   return count > 0 ? Array.from({ length: count }, (_, i) => i + 1) : [1]
 })
 
-const detailResultLines = computed(() => {
-  const count = detailDiffLines.value.length
+const detailOriginalResultLines = computed(() => {
+  const count = detailOriginalResult.value.split('\n').length
   return count > 0 ? Array.from({ length: count }, (_, i) => i + 1) : [1]
 })
 
-const detailDiffLines = computed((): DiffLine[] => {
-  if (!detailOutput.value) return []
-  return detailOutput.value.split('\n').map(line => {
-    if (line.startsWith('- ')) {
-      return { prefix: '-', content: line.substring(2) }
-    } else if (line.startsWith('+ ')) {
-      return { prefix: '+', content: line.substring(2) }
-    } else if (line.startsWith('  ')) {
-      return { prefix: ' ', content: line.substring(2) }
-    }
-    return { prefix: ' ', content: line }
-  })
+const detailModifiedResultLines = computed(() => {
+  const count = detailModifiedResult.value.split('\n').length
+  return count > 0 ? Array.from({ length: count }, (_, i) => i + 1) : [1]
 })
-
-const getDiffLineClass = (line: DiffLine) => {
-  if (line.prefix === '-') return 'bg-red-100 text-red-800'
-  if (line.prefix === '+') return 'bg-green-100 text-green-800'
-  return ''
-}
 
 const showDiffDetail = (result: SavedResult) => {
   selectedResult.value = result
   detailOriginal.value = getDiffOriginal(result.input)
   detailModified.value = getDiffModified(result.input)
-  detailOutput.value = result.output
+  detailOriginalResult.value = getDiffOriginalResult(result.output)
+  detailModifiedResult.value = getDiffModifiedResult(result.output)
   showDetail.value = true
+}
+
+const editPreviousInputs = () => {
+  diffCheckerStore.setInputs(detailOriginal.value, detailModified.value)
+  router.push({ name: 'diff-checker' })
+}
+
+const editSolvedInputs = () => {
+  diffCheckerStore.setInputs(detailOriginalResult.value, detailModifiedResult.value)
+  router.push({ name: 'diff-checker' })
 }
 
 const closeDetail = () => {
@@ -386,4 +422,15 @@ onMounted(() => {
 .markdown-preview :deep(p) {
   margin-bottom: 0.5rem;
 }
+
+/* Dark mode */
+:global(.dark) .markdown-preview :deep(h1)                          { color: #f1f5f9; }
+:global(.dark) .markdown-preview :deep(h2)                          { color: #e2e8f0; }
+:global(.dark) .markdown-preview :deep(h3),
+:global(.dark) .markdown-preview :deep(h4),
+:global(.dark) .markdown-preview :deep(h5),
+:global(.dark) .markdown-preview :deep(h6)                          { color: #cbd5e1; }
+:global(.dark) .markdown-preview :deep(code)                        { background-color: #1c2a3a; color: #e2e8f0; }
+:global(.dark) .markdown-preview :deep(blockquote)                  { border-left-color: #374151; color: #94a3b8; }
+:global(.dark) .markdown-preview :deep(hr)                          { border-top-color: #374151; }
 </style>

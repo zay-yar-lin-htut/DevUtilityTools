@@ -2,12 +2,14 @@
 import { ref, onMounted } from 'vue'
 import { RouterView, RouterLink } from 'vue-router'
 import { useAuthStore } from './stores/auth'
+import { useDarkMode } from './composables/useDarkMode'
 import AlertMessage from './components/AlertMessage.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import { useAlert } from './composables/useAlert'
 import { useConfirm } from './composables/useConfirm'
 
 const authStore = useAuthStore()
+const { isDark, toggle: toggleDark, init: initDark } = useDarkMode()
 const isMobileMenuOpen = ref(false)
 
 const alert   = useAlert()
@@ -23,6 +25,7 @@ const onScroll = () => {
 }
 
 onMounted(() => {
+  initDark()
   authStore.init()
   window.addEventListener('scroll', onScroll, { passive: true })
 })
@@ -89,6 +92,19 @@ const closeMobileMenu = () => {
 
           <!-- Desktop Auth Buttons -->
           <div class="hidden md:flex items-center gap-2">
+            <!-- Dark mode toggle -->
+            <button
+              @click="toggleDark"
+              class="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
+              :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
+            >
+              <svg v-if="isDark" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+              <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+              </svg>
+            </button>
             <template v-if="authStore.isAuthenticated">
               <!-- Avatar circle -->
               <div class="flex items-center gap-3 pl-1 pr-2">
@@ -131,7 +147,20 @@ const closeMobileMenu = () => {
           </div>
 
           <!-- Mobile Menu Button -->
-          <div class="flex items-center md:hidden">
+          <div class="flex items-center gap-2 md:hidden">
+            <!-- Dark toggle (mobile) -->
+            <button
+              @click="toggleDark"
+              class="p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
+              :title="isDark ? 'Light mode' : 'Dark mode'"
+            >
+              <svg v-if="isDark" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+              <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+              </svg>
+            </button>
             <button 
               @click="isMobileMenuOpen = !isMobileMenuOpen"
               class="text-gray-600 hover:text-gray-900 p-2 rounded-md"

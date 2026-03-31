@@ -655,4 +655,15 @@ const loadExample = () => {
 /* Colour tokens inside the overlay */
 :deep(.jnorm) { color: #1e293b; }   /* normal JSON text */
 :deep(.jc)    { color: #6b7280; font-style: italic; }   /* // comment */
+
+/* Dark mode code colours */
+:global(.dark) :deep(.jnorm) { color: #e2e8f0; }
+:global(.dark) :deep(.jk)    { color: #79b8ff; }
+:global(.dark) :deep(.js)    { color: #f97583; }
+:global(.dark) :deep(.jnum)  { color: #79c0ff; }
+:global(.dark) :deep(.jb)    { color: #d2a8ff; }
+:global(.dark) :deep(.jn)    { color: #d2a8ff; }
+:global(.dark) :deep(.jc)    { color: #8b949e; font-style: italic; }
+:global(.dark) :deep(.err-mark) { background: rgba(127,29,29,0.6); border-bottom-color: #ef4444; }
+:global(.dark) .code-textarea-transparent { caret-color: #e2e8f0; }
 </style>

@@ -366,4 +366,27 @@ onMounted(async () => {
 
 .history-input { flex: 1; font-size: 0.9rem; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .history-time  { flex-shrink: 0; font-size: 0.8rem; color: #9ca3af; }
+
+/* ── Dark mode overrides ──────────────────────────────────────────── */
+:global(.dark) .section-title  { color: #f1f5f9; }
+:global(.dark) .section-sub    { color: #94a3b8; }
+
+:global(.dark) .tool-card      { background: #1a2233; border-color: #2d3748; }
+:global(.dark) .tool-card:hover { border-color: #6366f1; }
+:global(.dark) .tool-card-name  { color: #f1f5f9; }
+:global(.dark) .tool-card:hover .tool-card-name { color: #818cf8; }
+:global(.dark) .tool-card-desc  { color: #94a3b8; }
+:global(.dark) .tool-card-arrow { color: #374151; }
+:global(.dark) .tool-card:hover .tool-card-arrow { color: #818cf8; }
+
+:global(.dark) .history-item   { background: #1a2233; border-color: #2d3748; }
+:global(.dark) .history-item:hover { border-color: #a5b4fc; }
+:global(.dark) .history-input  { color: #94a3b8; }
+:global(.dark) .history-time   { color: #64748b; }
+
+:global(.dark) .badge-blue   { background: #1e2a4a; color: #93c5fd; }
+:global(.dark) .badge-green  { background: #14302a; color: #6ee7b7; }
+:global(.dark) .badge-purple { background: #281e4a; color: #c4b5fd; }
+:global(.dark) .badge-yellow { background: #2a2010; color: #fcd34d; }
+:global(.dark) .badge-gray   { background: #1c2230; color: #94a3b8; }
 </style>
